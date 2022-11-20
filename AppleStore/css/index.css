@@ -1,0 +1,156 @@
+* {
+
+}
+
+body {
+    font-family: 'Raleway', sans-serif;
+    color: #213053;
+    margin: 0px;
+    font-size: 14px;
+    margin: 0;
+}
+a {
+    color: #fff;
+    text-decoration: none;
+}
+.header {
+    position:sticky;
+    top: 0;
+    z-index: 1;
+    background-color: black;
+}
+.header__top {
+    padding: 20px 0;
+    font-size: medium;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+}
+.header__top-content {
+    display: flex;
+    align-items:center ;   
+}
+
+.logo img{
+    height: 25px;
+    width: 25px;
+    margin-left: 300px;
+}
+
+
+.header__main-menu {
+    margin-left: 120px;
+    margin-right: 350px;
+}
+.main-menu__item {
+    display: inline-block;
+    margin-left: 40px;
+}
+.main-menu__item a:hover {
+    text-decoration: underline;
+    text-decoration-color: #A400FF;
+    color:#A400FF;
+    transition: 0.5s;
+}
+
+.header__top-right {
+    display: flex;
+}
+.header__search {
+    color: #fff;
+    font-size: 15px;
+    position: relative;
+    left: 50px;
+}
+.header__search:hover{
+    color:#A400FF;
+    transition: 0.2s;
+}
+.header__trash {
+    color: #fff;
+    font-size: 15px;
+}
+.header__trash:hover{
+    color:#A400FF;
+    transition: 0.2s;
+}
+  
+.cards {
+    background-color: #fff;
+    display: grid;
+    grid-column-gap: 6px;
+    grid-row-gap: 6px;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding-top: 2px;
+}
+.iMac img{
+    height: 206px;
+    width: 280px;
+    padding: 10px 20px 0 20px;
+}
+.accessories img{
+    height: 185px;
+    width: 230px;
+    padding: 10px 20px 0 20px;
+}
+
+.cards__item {
+    height: 459px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+   /* box-shadow: 0px 0px 10px rgba(196, 199, 197, 0.881);*/
+}
+.card__item-link:hover {
+    transform: scale(1.5);
+    transition: 0.2s;
+    transition-delay: 0.1s;
+    transition-timing-function: linear ;
+    box-shadow: 0px 0px 10px rgba(196, 199, 197, 0.881);
+}
+.cards__item a {
+    color: black;
+}
+.card__item-img {
+    width: 300px;
+    height: auto;
+}
+
+footer {
+    padding: 70px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: black;
+    background-color: rgba(223, 223, 223, 0.767);
+
+}
+.footer__container {
+    display:flex;
+    justify-content: center;
+
+}
+.footer__copyright {
+    margin-top: 40px;
+    text-align: center;
+    opacity: 0.5;
+}
+.footer__group{
+    margin-right: 80px;
+
+}
+.footer__group h3 {
+    font-size: 16px;
+    opacity: 0.75;
+    margin-bottom: 30px;
+}
+.footer__links {
+    display:flex;
+    flex-direction: column;
+}
+.footer__links a {
+    color: black;
+    padding-bottom: 15px;
+    opacity: 0.65;
+}
