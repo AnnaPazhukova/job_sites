@@ -25,15 +25,21 @@ a {
     font-size: medium;
     margin: 0 auto;
     display: flex;
+    justify-content: space-around;
 }
 .header__top  a {
-    margin: 10px auto;
+    margin: 10px 10px;
+    font-weight: 550;
     color: rgb(43, 41, 43);
     text-decoration: none;
 }
 .header__top  a:hover {
     text-decoration: underline;
     text-decoration-color: rgb(43, 41, 43);
+}
+.header__top-right {
+    align-items: center;
+    margin-left: 50px;
 }
 
 section {
@@ -48,9 +54,12 @@ section {
     height: 500px;
     text-align: center;
 }
-
+.section__text p {
+    line-height: 32px;
+}
 .section__img img {
     width: 480px;
     height: 500px;
+    box-shadow: -2px 2px 30px rgb(121, 119, 119);
 }
 
