@@ -1,8 +1,10 @@
+
 body {
     font-family: 'Raleway', sans-serif;
     margin: 0px;
     font-size: 20px;
     background-color: linen;
+    overflow-x: hidden;
 }
 a {
     color: rgb(43, 41, 43);
@@ -21,7 +23,7 @@ a {
 
 }
 .header__top {
-    padding: 20px 0;
+    padding: 30px 0;
     font-size: medium;
     margin: 0 auto;
     display: flex;
@@ -41,25 +43,123 @@ a {
     align-items: center;
     margin-left: 50px;
 }
+.more {
+    display: inline-block;
+}
+.more__dropdown-content {
+    display: none;
+    position: absolute;
+    right: 210px;
+    background-color: rgb(230, 222, 214);
+    min-width: 100px;
+    box-shadow: 5px 5px 5px rgba(0,0,0,0.2);
+    font-size: 16px;
+    z-index: 1;
+}
+.more__dropdown-content a {
+    color: black;
+    padding: 5px 5px;
+    display: block;
+}
+  
+.more__dropdown-content a:hover {
+    background-color: rgb(216, 207, 207);
+    text-decoration: none;
+}
+  
+.more:hover .more__dropdown-content {
+    display: block;
+}
 
-section {
+.section__one {
     display: flex;
-    margin: 50px 80px;
+    margin: 25px 80px;
     justify-content: space-evenly;
     align-items: center;
+    height: 80vh;
 }
 
-.section__text {
-    width: 500px;
-    height: 500px;
+.section__one-text {
+    width: 430px;
+    height: 430px;
     text-align: center;
 }
-.section__text p {
+.section__one-text p {
     line-height: 32px;
 }
-.section__img img {
-    width: 480px;
-    height: 500px;
+.section__one-img img {
+    width: 430px;
+    height: 450px;
     box-shadow: -2px 2px 30px rgb(121, 119, 119);
 }
+
+.section__two {
+    background: white;
+    padding: 10px;
+    height: 730px;
+    text-align: center;
+}
+.section__two a {
+    padding: 10px;
+    color: rgb(193, 152, 134);
+    box-shadow: 2px 2px 10px rgba(200, 172, 160, 0.593);
+}
+
+.section__two-main {
+    padding: 20px;
+    display: flex;
+    justify-content: space-around;   
+}
+.section__two-img {
+    display: grid;
+    grid-template-columns: 400px 400px;
+    grid-template-rows: 310px 310px;
+}
+.section__two-img img {
+    padding: 2px;
+    width: 370px;
+    height: 290px;
+}
+
+.section__two-info {
+    width: 500px;
+}
+.section__two-info h3 {
+    color: rgb(193, 152, 134);
+    text-decoration: underline;
+    text-decoration-color: rgb(134, 125, 114);
+}
+footer {
+    padding: 70px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: black;
+    background-color: rgba(223, 223, 223, 0.767);
+    height: 40vh;
+
+}
+.footer__container {
+    display:flex;
+    justify-content: space-evenly;
+
+}
+.footer__group{
+    margin-right: 80px;
+
+}
+.footer__group h3 {
+    font-size: 16px;
+    opacity: 0.75;
+    margin-bottom: 30px;
+}
+.footer__links {
+    display:flex;
+    flex-direction: column;
+}
+.footer__links a {
+    color: black;
+    padding-bottom: 15px;
+    opacity: 0.65;
+}
+
 
