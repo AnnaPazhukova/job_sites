@@ -23,7 +23,28 @@ npm run build    # сборка (tsc -b && vite build)
 
 ## Хранение данных
 
-Данные сейчас хранятся в `localStorage` браузера через слой `src/lib/storage.ts`
-(`DataAdapter`). Чтобы подключить бэкенд позже, достаточно реализовать `DataAdapter`
-(`get`/`set`) поверх API и заменить `dataAdapter` — компоненты и хук `useStore`
-менять не придётся.
+Данные хранятся за интерфейсом `DataAdapter` (`src/lib/storage.ts`), поэтому
+бэкенд можно менять, не трогая компоненты и хук `useStore`.
+
+- **Без настройки** (нет `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`) — данные
+  живут в `localStorage` браузера, входа не требуется. Удобно для локальной
+  разработки без своего проекта Supabase.
+- **С Supabase** — при наличии обеих переменных окружения `AuthGate`
+  (`src/AuthGate.tsx`) показывает экран входа/регистрации и после входа
+  переключает хранилище на `SupabaseAdapter` (`src/lib/supabaseStorage.ts`):
+  данные пишутся в таблицу `app_kv`, защищённую row-level security, так что
+  каждый пользователь видит только свои данные и они доступны с любого
+  устройства.
+
+### Настройка Supabase
+
+1. Создайте бесплатный проект на [supabase.com](https://supabase.com).
+2. В SQL Editor выполните `supabase/schema.sql` (создаёт таблицу `app_kv` и
+   политики RLS).
+3. В Project Settings → API скопируйте **Project URL** и **anon public key**.
+4. Для локальной разработки: скопируйте `.env.example` в `.env.local` и
+   вставьте оба значения.
+5. Для деплоя: добавьте оба значения как секреты репозитория GitHub
+   (Settings → Secrets and variables → Actions) с именами
+   `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — workflow подставит их при
+   сборке.

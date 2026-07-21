@@ -12,7 +12,7 @@ export interface DataAdapter {
 
 const NAMESPACE = "tutorapp:";
 
-class LocalStorageAdapter implements DataAdapter {
+export class LocalStorageAdapter implements DataAdapter {
   async get<T>(key: string): Promise<T | null> {
     try {
       const raw = localStorage.getItem(NAMESPACE + key);
@@ -27,7 +27,13 @@ class LocalStorageAdapter implements DataAdapter {
   }
 }
 
-export const dataAdapter: DataAdapter = new LocalStorageAdapter();
+// Swappable at runtime: AuthGate points this at a SupabaseAdapter once a
+// user is signed in, before the data-driven <App/> ever mounts.
+export let dataAdapter: DataAdapter = new LocalStorageAdapter();
+
+export function setDataAdapter(adapter: DataAdapter) {
+  dataAdapter = adapter;
+}
 
 export function useStore<T>(key: string, initial: T): [T, (next: T) => void, boolean] {
   const [value, setValue] = useState<T>(initial);
