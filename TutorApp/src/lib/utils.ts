@@ -6,6 +6,8 @@ export const MONTHS_RU = [
 ];
 export const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
+export const GRADES = ["5 класс", "6 класс", "7 класс", "8 класс", "9 класс", "10 класс", "11 класс"];
+
 export const LESSON_DURATIONS: { minutes: number; label: string }[] = [
   { minutes: 45, label: "45 мин" },
   { minutes: 60, label: "1 час" },
