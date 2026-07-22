@@ -19,9 +19,8 @@ export interface Student {
   subscription: Subscription | null;
   joinedAt: string;
   birthDate?: string;
-  city?: string;
+  grade?: string;
   school?: string;
-  timezone?: string;
   goal?: string;
 }
 

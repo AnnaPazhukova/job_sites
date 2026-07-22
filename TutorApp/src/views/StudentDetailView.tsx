@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   Clock,
   Mail,
-  MapPin,
   MessageCircle,
   Plus,
   School,
@@ -17,8 +16,8 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, TextInput, ToggleRow } from "../components/ui";
-import { dateKey, fmtDateRu, TODAY_KEY, uid } from "../lib/utils";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, Select, TextInput, ToggleRow } from "../components/ui";
+import { dateKey, fmtDateRu, GRADES, TODAY_KEY, uid } from "../lib/utils";
 import type { Homework, Lesson, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -157,16 +156,13 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
               <TextInput icon={Mail} type="email" value={student.email || ""} onChange={(e) => save({ email: e.target.value })} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Город">
-                <TextInput icon={MapPin} value={student.city || ""} onChange={(e) => save({ city: e.target.value })} placeholder="Москва" />
+              <Field label="Класс">
+                <Select value={student.grade || GRADES[2]} onChange={(v) => save({ grade: v })} options={GRADES} />
               </Field>
-              <Field label="Часовой пояс">
-                <TextInput value={student.timezone || ""} onChange={(e) => save({ timezone: e.target.value })} placeholder="МСК +0" />
+              <Field label="Учебное заведение">
+                <TextInput icon={School} value={student.school || ""} onChange={(e) => save({ school: e.target.value })} placeholder="Лицей №9" />
               </Field>
             </div>
-            <Field label="Учебное заведение">
-              <TextInput icon={School} value={student.school || ""} onChange={(e) => save({ school: e.target.value })} placeholder="Лицей №9" />
-            </Field>
             <Field label="Цель занятий">
               <TextInput icon={Target} value={student.goal || ""} onChange={(e) => save({ goal: e.target.value })} placeholder="Сдать ЕГЭ на 90+ баллов" />
             </Field>

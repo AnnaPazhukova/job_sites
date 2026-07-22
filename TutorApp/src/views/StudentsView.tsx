@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Calendar as CalendarIcon, Mail, MapPin, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
-import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
-import { durationLabel, fmtMoney, TODAY_KEY, uid } from "../lib/utils";
+import { Calendar as CalendarIcon, Mail, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
+import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, Select, TextInput } from "../components/ui";
+import { durationLabel, fmtMoney, GRADES, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
 
 // Positive balance = prepaid credit (paid lessons still in the future).
@@ -45,9 +45,8 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
     rate: number;
     duration: number;
     birthDate: string;
-    city: string;
+    grade: string;
     school: string;
-    timezone: string;
     goal: string;
   }) {
     const name = `${data.firstName} ${data.lastName}`.trim();
@@ -168,9 +167,8 @@ function AddStudentModal({
     rate: number;
     duration: number;
     birthDate: string;
-    city: string;
+    grade: string;
     school: string;
-    timezone: string;
     goal: string;
   }) => void;
 }) {
@@ -181,15 +179,14 @@ function AddStudentModal({
   const [rate, setRate] = useState("");
   const [duration, setDuration] = useState(60);
   const [birthDate, setBirthDate] = useState("");
-  const [city, setCity] = useState("");
+  const [grade, setGrade] = useState(GRADES[2]);
   const [school, setSchool] = useState("");
-  const [timezone, setTimezone] = useState("МСК +0");
   const [goal, setGoal] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!firstName.trim() && !lastName.trim()) return;
-    onSave({ firstName: firstName.trim(), lastName: lastName.trim(), phone, email, rate: Number(rate) || 0, duration, birthDate, city, school, timezone, goal });
+    onSave({ firstName: firstName.trim(), lastName: lastName.trim(), phone, email, rate: Number(rate) || 0, duration, birthDate, grade, school, goal });
   }
 
   return (
@@ -223,21 +220,16 @@ function AddStudentModal({
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Город">
-            <TextInput icon={MapPin} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Москва" />
+          <Field label="Класс">
+            <Select value={grade} onChange={setGrade} options={GRADES} />
           </Field>
           <Field label="Учебное заведение">
             <TextInput icon={School} value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Лицей №9" />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Часовой пояс">
-            <TextInput value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="МСК +0" />
-          </Field>
-          <Field label="Цель занятий">
-            <TextInput icon={Target} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Сдать ЕГЭ на 90+ баллов" />
-          </Field>
-        </div>
+        <Field label="Цель занятий">
+          <TextInput icon={Target} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Сдать ЕГЭ на 90+ баллов" />
+        </Field>
         <PrimaryButton type="submit" full>
           Добавить ученика
         </PrimaryButton>
