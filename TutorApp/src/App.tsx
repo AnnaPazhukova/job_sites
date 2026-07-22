@@ -15,7 +15,7 @@ import {
 import { useStore } from "./lib/storage";
 import { TODAY_KEY } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId, WeeklyTemplateSlot } from "./lib/types";
 
 import { StudentsView } from "./views/StudentsView";
 import { StudentDetailPage } from "./views/StudentDetailView";
@@ -38,7 +38,12 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon }[] = [
   { id: "stats", label: "Статистика", icon: TrendingUp },
 ];
 
-export default function App() {
+interface AppProps {
+  userEmail?: string;
+  onSignOut?: () => void;
+}
+
+export default function App({ userEmail, onSignOut }: AppProps) {
   const [view, setView] = useState<ViewId>("students");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -46,6 +51,7 @@ export default function App() {
   const [students, setStudents, studentsLoaded] = useStore<Student[]>("students", []);
   const [groups, setGroups] = useStore<Group[]>("groups", []);
   const [lessons, setLessons] = useStore<Lesson[]>("lessons", []);
+  const [weeklyTemplate, setWeeklyTemplate] = useStore<WeeklyTemplateSlot[]>("weekly-template", []);
   const [homework, setHomework] = useStore<Homework[]>("homework", []);
   const [messages, setMessages] = useStore<MessagesByStudent>("messages", {});
   const [tasks, saveTasks] = useStore<Task[]>("tasks", []);
@@ -94,7 +100,8 @@ export default function App() {
               <span className="text-[#111827]">Space</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {userEmail && <span className="hidden sm:inline text-sm text-gray-500 truncate max-w-[180px]">{userEmail}</span>}
             <button onClick={handleBellClick} className="relative p-2.5 rounded-full hover:bg-gray-100 text-gray-500 transition">
               <Bell size={20} strokeWidth={1.8} />
               {pendingHw + dueUnpaid > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />}
@@ -130,7 +137,7 @@ export default function App() {
           </nav>
           <nav className="pt-4 border-t border-[#E7E9EE] mt-4">
             <button
-              onClick={() => showToast("Вы вышли из аккаунта")}
+              onClick={() => (onSignOut ? onSignOut() : showToast("Вы вышли из аккаунта"))}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#DC2626] hover:bg-red-50 transition text-[15px] font-medium"
             >
               <LogOut size={19} strokeWidth={2} />
@@ -170,7 +177,18 @@ export default function App() {
                 />
               )}
               {view === "groups" && <GroupsView groups={groups} setGroups={setGroups} students={students} showToast={showToast} />}
-              {view === "schedule" && <ScheduleView lessons={lessons} setLessons={setLessons} students={students} groups={groups} showToast={showToast} />}
+              {view === "schedule" && (
+                <ScheduleView
+                  lessons={lessons}
+                  setLessons={setLessons}
+                  students={students}
+                  setStudents={setStudents}
+                  groups={groups}
+                  weeklyTemplate={weeklyTemplate}
+                  setWeeklyTemplate={setWeeklyTemplate}
+                  showToast={showToast}
+                />
+              )}
               {view === "messages" && <MessagesView students={students} messages={messages} setMessages={setMessages} />}
               {view === "homework" && <HomeworkView homework={homework} setHomework={setHomework} students={students} showToast={showToast} />}
               {view === "tasks" && <TasksView tasks={tasks} saveTasks={saveTasks} showToast={showToast} />}

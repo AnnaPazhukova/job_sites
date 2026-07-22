@@ -23,7 +23,54 @@ npm run build    # сборка (tsc -b && vite build)
 
 ## Хранение данных
 
-Данные сейчас хранятся в `localStorage` браузера через слой `src/lib/storage.ts`
-(`DataAdapter`). Чтобы подключить бэкенд позже, достаточно реализовать `DataAdapter`
-(`get`/`set`) поверх API и заменить `dataAdapter` — компоненты и хук `useStore`
-менять не придётся.
+Данные хранятся за интерфейсом `DataAdapter` (`src/lib/storage.ts`), поэтому
+бэкенд можно менять, не трогая компоненты и хук `useStore`.
+
+- **Без настройки** (нет `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`) — данные
+  живут в `localStorage` браузера, входа не требуется. Удобно для локальной
+  разработки без своего проекта Supabase.
+- **С Supabase** — при наличии обеих переменных окружения `AuthGate`
+  (`src/AuthGate.tsx`) показывает экран входа/регистрации и после входа
+  переключает хранилище на `SupabaseAdapter` (`src/lib/supabaseStorage.ts`):
+  данные пишутся в таблицу `app_kv`, защищённую row-level security, так что
+  каждый пользователь видит только свои данные и они доступны с любого
+  устройства.
+
+### Настройка Supabase
+
+1. Создайте бесплатный проект на [supabase.com](https://supabase.com).
+2. В SQL Editor выполните `supabase/schema.sql` (создаёт таблицу `app_kv` и
+   политики RLS).
+3. В Project Settings → API скопируйте **Project URL** и **anon public key**.
+4. Для локальной разработки: скопируйте `.env.example` в `.env.local` и
+   вставьте оба значения.
+5. Для деплоя: добавьте оба значения как секреты репозитория GitHub
+   (Settings → Secrets and variables → Actions) с именами
+   `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — workflow подставит их при
+   сборке.
+
+## Google Calendar (опционально)
+
+На странице «Расписание» можно подключить Google Calendar в режиме
+только для чтения: события из основного календаря показываются в
+месячной и недельной сетке (не создаются и не редактируются). Интеграция
+полностью на стороне браузера, без бэкенда — токен доступа получается
+через Google Identity Services и не сохраняется на сервере.
+
+1. Зайдите на [console.cloud.google.com](https://console.cloud.google.com),
+   создайте проект.
+2. В «APIs & Services → Library» включите **Google Calendar API**.
+3. В «APIs & Services → OAuth consent screen» настройте экран согласия
+   (User Type: External), добавьте свой аккаунт в Test users — этого
+   достаточно для личного использования, без прохождения верификации Google.
+4. В «APIs & Services → Credentials» создайте **OAuth client ID** типа
+   **Web application**. В Authorized JavaScript origins добавьте:
+   - `https://annapazhukova.github.io`
+   - `http://localhost:5173` (для локальной разработки)
+5. Скопируйте Client ID (вида `xxxxx.apps.googleusercontent.com`).
+6. Локально: добавьте `VITE_GOOGLE_CLIENT_ID` в `.env.local`.
+7. Для деплоя: добавьте `VITE_GOOGLE_CLIENT_ID` как секрет репозитория
+   GitHub (Settings → Secrets and variables → Actions).
+
+Без этой переменной кнопка подключения Google Calendar просто не
+показывается — остальной функционал не затрагивается.
