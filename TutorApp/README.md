@@ -48,3 +48,29 @@ npm run build    # сборка (tsc -b && vite build)
    (Settings → Secrets and variables → Actions) с именами
    `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — workflow подставит их при
    сборке.
+
+## Google Calendar (опционально)
+
+На странице «Расписание» можно подключить Google Calendar в режиме
+только для чтения: события из основного календаря показываются в
+месячной и недельной сетке (не создаются и не редактируются). Интеграция
+полностью на стороне браузера, без бэкенда — токен доступа получается
+через Google Identity Services и не сохраняется на сервере.
+
+1. Зайдите на [console.cloud.google.com](https://console.cloud.google.com),
+   создайте проект.
+2. В «APIs & Services → Library» включите **Google Calendar API**.
+3. В «APIs & Services → OAuth consent screen» настройте экран согласия
+   (User Type: External), добавьте свой аккаунт в Test users — этого
+   достаточно для личного использования, без прохождения верификации Google.
+4. В «APIs & Services → Credentials» создайте **OAuth client ID** типа
+   **Web application**. В Authorized JavaScript origins добавьте:
+   - `https://annapazhukova.github.io`
+   - `http://localhost:5173` (для локальной разработки)
+5. Скопируйте Client ID (вида `xxxxx.apps.googleusercontent.com`).
+6. Локально: добавьте `VITE_GOOGLE_CLIENT_ID` в `.env.local`.
+7. Для деплоя: добавьте `VITE_GOOGLE_CLIENT_ID` как секрет репозитория
+   GitHub (Settings → Secrets and variables → Actions).
+
+Без этой переменной кнопка подключения Google Calendar просто не
+показывается — остальной функционал не затрагивается.

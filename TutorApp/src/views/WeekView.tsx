@@ -1,5 +1,7 @@
+import { ExternalLink } from "lucide-react";
 import { dateKey, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson } from "../lib/types";
+import type { GcalEvent } from "../lib/googleCalendar";
 
 export function startOfWeek(d: Date) {
   const day = (d.getDay() + 6) % 7; // Mon=0
@@ -33,18 +35,21 @@ function addMinutes(time: string, minutes: number) {
 interface Props {
   cursor: Date;
   lessons: Lesson[];
+  gcalEvents?: GcalEvent[];
   onDayClick: (date: Date) => void;
   onLessonClick: (lesson: Lesson) => void;
 }
 
-export function WeekView({ cursor, lessons, onDayClick, onLessonClick }: Props) {
+export function WeekView({ cursor, lessons, gcalEvents = [], onDayClick, onLessonClick }: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
 
   return (
     <div className="grid grid-cols-7 divide-x divide-[#F0F1F4]">
       {days.map((d, i) => {
-        const dayLessons = lessons.filter((l) => l.date === dateKey(d)).sort((a, b) => a.time.localeCompare(b.time));
+        const key = dateKey(d);
+        const dayLessons = lessons.filter((l) => l.date === key).sort((a, b) => a.time.localeCompare(b.time));
+        const dayGcal = gcalEvents.filter((e) => e.date === key).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
         return (
           <div key={i} className="min-h-[440px] flex flex-col">
             <div className={`text-center py-3 border-b border-[#F0F1F4] ${isToday(d) ? "bg-[#EEF2FF]" : "bg-[#FAFBFC]"}`}>
@@ -56,6 +61,22 @@ export function WeekView({ cursor, lessons, onDayClick, onLessonClick }: Props) 
               </div>
             </div>
             <div onClick={() => onDayClick(d)} className="flex-1 p-1.5 space-y-1.5 cursor-pointer hover:bg-[#FAFBFC] transition">
+              {dayGcal.map((e) => (
+                <a
+                  key={e.id}
+                  href={e.htmlLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="w-full flex items-start gap-1 text-left text-[11px] px-2 py-1.5 rounded-lg font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div>{e.allDay ? "Весь день" : `${e.time}–${e.endTime || ""}`}</div>
+                    <div className="truncate">{e.title}</div>
+                  </div>
+                  <ExternalLink size={11} className="shrink-0 mt-0.5" />
+                </a>
+              ))}
               {dayLessons.map((l) => (
                 <button
                   key={l.id}
@@ -78,7 +99,7 @@ export function WeekView({ cursor, lessons, onDayClick, onLessonClick }: Props) 
                   <div className="truncate">{l.title}</div>
                 </button>
               ))}
-              {dayLessons.length === 0 && <div className="text-center text-[11px] text-gray-300 pt-4">Пусто</div>}
+              {dayLessons.length === 0 && dayGcal.length === 0 && <div className="text-center text-[11px] text-gray-300 pt-4">Пусто</div>}
             </div>
           </div>
         );

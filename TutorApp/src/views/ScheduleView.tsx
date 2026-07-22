@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
-import { Calendar as CalendarIcon, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus, Wallet } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
 import { Card, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { dateKey, MONTHS_RU, TODAY, WEEKDAYS_RU, uid } from "../lib/utils";
 import type { Group, Lesson, Student, WeeklyTemplateSlot } from "../lib/types";
+import type { GcalEvent } from "../lib/googleCalendar";
+import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { LessonFormModal } from "./StudentDetailView";
 import { StudentBalances } from "./StudentBalances";
 import { WeekView, getWeekDays } from "./WeekView";
 import { WeeklyTemplateModal } from "./WeeklyTemplateModal";
+
+type DayItem = { kind: "gcal"; e: GcalEvent } | { kind: "lesson"; l: Lesson };
 
 interface Props {
   lessons: Lesson[];
@@ -47,8 +51,29 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
 
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
 
-  function lessonsOn(d: Date) {
-    return lessons.filter((l) => l.date === dateKey(d));
+  const rangeStartISO = useMemo(() => {
+    const base = mode === "month" ? cells[0]?.date : getWeekDays(cursor)[0];
+    const d = new Date(base || cursor);
+    d.setDate(d.getDate() - 1);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, [mode, cells, cursor]);
+
+  const rangeEndISO = useMemo(() => {
+    const base = mode === "month" ? cells[cells.length - 1]?.date : getWeekDays(cursor)[6];
+    const d = new Date(base || cursor);
+    d.setDate(d.getDate() + 2);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, [mode, cells, cursor]);
+
+  const gcal = useGoogleCalendar(rangeStartISO, rangeEndISO);
+
+  function itemsOn(d: Date): DayItem[] {
+    const key = dateKey(d);
+    const gcalItems: DayItem[] = gcal.events.filter((e) => e.date === key).map((e) => ({ kind: "gcal", e }));
+    const lessonItems: DayItem[] = lessons.filter((l) => l.date === key).map((l) => ({ kind: "lesson", l }));
+    return [...gcalItems, ...lessonItems];
   }
 
   function openAdd(date: Date) {
@@ -160,6 +185,23 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
                 <CalendarClock size={15} /> Шаблон недели
               </button>
             )}
+            {gcal.enabled &&
+              (gcal.connected ? (
+                <div className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
+                  <CalendarCheck2 size={15} /> Google Calendar
+                  <button onClick={gcal.disconnect} className="p-0.5 rounded-full hover:bg-emerald-100 text-emerald-600" title="Отключить">
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={gcal.connect}
+                  disabled={gcal.connecting}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition disabled:opacity-50"
+                >
+                  <CalendarPlus size={15} /> {gcal.connecting ? "Подключение..." : "Подключить Google Calendar"}
+                </button>
+              ))}
             <PrimaryButton icon={Plus} onClick={() => openAdd(TODAY)}>
               Добавить занятие
             </PrimaryButton>
@@ -172,6 +214,8 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
         <div className="mb-4 text-sm bg-amber-50 text-amber-700 px-4 py-2.5 rounded-xl">Добавьте учеников, чтобы планировать занятия</div>
       )}
 
+      {gcal.error && <div className="mb-4 text-sm bg-red-50 text-red-600 px-4 py-2.5 rounded-xl">{gcal.error}</div>}
+
       {mode === "month" ? (
         <Card className="overflow-hidden">
           <div className="grid grid-cols-7 border-b border-[#E7E9EE] bg-[#FAFBFC]">
@@ -183,7 +227,7 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
           </div>
           <div className="grid grid-cols-7">
             {cells.map((c, i) => {
-              const dayLessons = lessonsOn(c.date);
+              const items = itemsOn(c.date);
               return (
                 <div
                   key={i}
@@ -194,20 +238,33 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
                     {c.day}
                   </div>
                   <div className="mt-1 space-y-1">
-                    {dayLessons.slice(0, 2).map((l) => (
-                      <button
-                        key={l.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditLesson(l);
-                        }}
-                        className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition
-                          ${l.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"}`}
-                      >
-                        {l.time} · {l.title}
-                      </button>
-                    ))}
-                    {dayLessons.length > 2 && <div className="text-[11px] text-gray-400">+{dayLessons.length - 2} ещё</div>}
+                    {items.slice(0, 2).map((item) =>
+                      item.kind === "gcal" ? (
+                        <a
+                          key={`g-${item.e.id}`}
+                          href={item.e.htmlLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="block text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+                        >
+                          {item.e.allDay ? "Весь день" : item.e.time} · {item.e.title}
+                        </a>
+                      ) : (
+                        <button
+                          key={item.l.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditLesson(item.l);
+                          }}
+                          className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition
+                            ${item.l.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"}`}
+                        >
+                          {item.l.time} · {item.l.title}
+                        </button>
+                      )
+                    )}
+                    {items.length > 2 && <div className="text-[11px] text-gray-400">+{items.length - 2} ещё</div>}
                   </div>
                 </div>
               );
@@ -216,7 +273,7 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <WeekView cursor={cursor} lessons={lessons} onDayClick={openAdd} onLessonClick={setEditLesson} />
+          <WeekView cursor={cursor} lessons={lessons} gcalEvents={gcal.events} onDayClick={openAdd} onLessonClick={setEditLesson} />
         </Card>
       )}
 
