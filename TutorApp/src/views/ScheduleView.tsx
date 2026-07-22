@@ -1,23 +1,31 @@
 import { useMemo, useState } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Wallet } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus, Wallet } from "lucide-react";
 import { Card, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { dateKey, MONTHS_RU, TODAY, WEEKDAYS_RU, uid } from "../lib/utils";
-import type { Group, Lesson, Student } from "../lib/types";
+import type { Group, Lesson, Student, WeeklyTemplateSlot } from "../lib/types";
 import { LessonFormModal } from "./StudentDetailView";
+import { StudentBalances } from "./StudentBalances";
+import { WeekView, getWeekDays } from "./WeekView";
+import { WeeklyTemplateModal } from "./WeeklyTemplateModal";
 
 interface Props {
   lessons: Lesson[];
   setLessons: (l: Lesson[]) => void;
   students: Student[];
+  setStudents: (s: Student[]) => void;
   groups: Group[];
+  weeklyTemplate: WeeklyTemplateSlot[];
+  setWeeklyTemplate: (t: WeeklyTemplateSlot[]) => void;
   showToast: (t: string) => void;
 }
 
-export function ScheduleView({ lessons, setLessons, students, groups, showToast }: Props) {
+export function ScheduleView({ lessons, setLessons, students, setStudents, groups, weeklyTemplate, setWeeklyTemplate, showToast }: Props) {
+  const [mode, setMode] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState(TODAY);
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<Date | null>(null);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
+  const [showTemplate, setShowTemplate] = useState(false);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -43,6 +51,11 @@ export function ScheduleView({ lessons, setLessons, students, groups, showToast 
     return lessons.filter((l) => l.date === dateKey(d));
   }
 
+  function openAdd(date: Date) {
+    setAddDate(date);
+    setShowAdd(true);
+  }
+
   function addLesson(data: Partial<Lesson>) {
     setLessons([...lessons, { id: uid(), status: "scheduled", paymentStatus: "pending", ...data } as Lesson]);
     setShowAdd(false);
@@ -61,87 +74,153 @@ export function ScheduleView({ lessons, setLessons, students, groups, showToast 
     setEditLesson(null);
   }
 
+  function goPrev() {
+    setCursor(mode === "month" ? new Date(year, month - 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
+  }
+
+  function goNext() {
+    setCursor(mode === "month" ? new Date(year, month + 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7));
+  }
+
+  function applyWeeklyTemplate() {
+    const days = getWeekDays(cursor);
+    let created = 0;
+    const next: Lesson[] = [...lessons];
+    for (const day of days) {
+      const key = dateKey(day);
+      const weekday = (day.getDay() + 6) % 7;
+      for (const slot of weeklyTemplate) {
+        if (slot.weekday !== weekday) continue;
+        const exists = next.some(
+          (l) => l.date === key && l.time === slot.time && l.studentId === slot.studentId && l.groupId === slot.groupId
+        );
+        if (exists) continue;
+        next.push({
+          id: uid(),
+          studentId: slot.studentId,
+          groupId: slot.groupId,
+          title: slot.title,
+          date: key,
+          time: slot.time,
+          duration: slot.duration,
+          price: slot.price,
+          status: "scheduled",
+          paymentStatus: "pending",
+        });
+        created++;
+      }
+    }
+    setLessons(next);
+    setShowTemplate(false);
+    showToast(created > 0 ? `Добавлено занятий по шаблону: ${created}` : "По шаблону нечего добавлять — всё уже в расписании");
+  }
+
+  const weekDays = mode === "week" ? getWeekDays(cursor) : [];
+  const weekLabel =
+    mode === "week" && weekDays.length
+      ? `${weekDays[0].getDate()} ${MONTHS_RU[weekDays[0].getMonth()].toLowerCase()} – ${weekDays[6].getDate()} ${MONTHS_RU[weekDays[6].getMonth()].toLowerCase()}`
+      : "";
+
   return (
     <div>
       <PageHeader
         title="Расписание"
         right={
           <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-xl border border-gray-300 bg-white p-0.5 text-sm shadow-sm">
+              <button
+                onClick={() => setMode("month")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "month" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
+              >
+                Месяц
+              </button>
+              <button
+                onClick={() => setMode("week")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "week" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
+              >
+                Неделя
+              </button>
+            </div>
             <button onClick={() => setCursor(TODAY)} className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition">
               Сегодня
             </button>
             <div className="flex items-center bg-white border border-gray-300 shadow-sm rounded-xl">
-              <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="p-2 hover:bg-gray-50 rounded-l-xl">
+              <button onClick={goPrev} className="p-2 hover:bg-gray-50 rounded-l-xl">
                 <ChevronLeft size={16} />
               </button>
-              <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="p-2 hover:bg-gray-50 rounded-r-xl">
+              <button onClick={goNext} className="p-2 hover:bg-gray-50 rounded-r-xl">
                 <ChevronRight size={16} />
               </button>
             </div>
-            <PrimaryButton
-              icon={Plus}
-              onClick={() => {
-                setAddDate(TODAY);
-                setShowAdd(true);
-              }}
-            >
+            {mode === "week" && (
+              <button
+                onClick={() => setShowTemplate(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition"
+              >
+                <CalendarClock size={15} /> Шаблон недели
+              </button>
+            )}
+            <PrimaryButton icon={Plus} onClick={() => openAdd(TODAY)}>
               Добавить занятие
             </PrimaryButton>
           </div>
         }
       />
-      <div className="text-xl font-bold mb-4">
-        {MONTHS_RU[month]} {year}
-      </div>
+      <div className="text-xl font-bold mb-4">{mode === "month" ? `${MONTHS_RU[month]} ${year}` : weekLabel}</div>
 
       {students.length === 0 && groups.length === 0 && (
         <div className="mb-4 text-sm bg-amber-50 text-amber-700 px-4 py-2.5 rounded-xl">Добавьте учеников, чтобы планировать занятия</div>
       )}
 
-      <Card className="overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-[#E7E9EE] bg-[#FAFBFC]">
-          {WEEKDAYS_RU.map((d) => (
-            <div key={d} className="text-center text-xs font-semibold text-gray-500 py-3">
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-          {cells.map((c, i) => {
-            const dayLessons = lessonsOn(c.date);
-            return (
-              <div
-                key={i}
-                onClick={() => {
-                  setAddDate(c.date);
-                  setShowAdd(true);
-                }}
-                className={`min-h-[92px] sm:min-h-[110px] border-b border-r border-[#F0F1F4] p-2 cursor-pointer hover:bg-[#FAFBFC] transition ${!c.current ? "bg-[#FCFCFD] text-gray-300" : ""}`}
-              >
-                <div className={`text-sm w-6 h-6 flex items-center justify-center rounded-full ${isToday(c.date) ? "bg-[#2563EB] text-white font-semibold" : c.current ? "text-gray-800" : "text-gray-300"}`}>
-                  {c.day}
-                </div>
-                <div className="mt-1 space-y-1">
-                  {dayLessons.slice(0, 2).map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditLesson(l);
-                      }}
-                      className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition
-                        ${l.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"}`}
-                    >
-                      {l.time} · {l.title}
-                    </button>
-                  ))}
-                  {dayLessons.length > 2 && <div className="text-[11px] text-gray-400">+{dayLessons.length - 2} ещё</div>}
-                </div>
+      {mode === "month" ? (
+        <Card className="overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-[#E7E9EE] bg-[#FAFBFC]">
+            {WEEKDAYS_RU.map((d) => (
+              <div key={d} className="text-center text-xs font-semibold text-gray-500 py-3">
+                {d}
               </div>
-            );
-          })}
-        </div>
-      </Card>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {cells.map((c, i) => {
+              const dayLessons = lessonsOn(c.date);
+              return (
+                <div
+                  key={i}
+                  onClick={() => openAdd(c.date)}
+                  className={`min-h-[92px] sm:min-h-[110px] border-b border-r border-[#F0F1F4] p-2 cursor-pointer hover:bg-[#FAFBFC] transition ${!c.current ? "bg-[#FCFCFD] text-gray-300" : ""}`}
+                >
+                  <div className={`text-sm w-6 h-6 flex items-center justify-center rounded-full ${isToday(c.date) ? "bg-[#2563EB] text-white font-semibold" : c.current ? "text-gray-800" : "text-gray-300"}`}>
+                    {c.day}
+                  </div>
+                  <div className="mt-1 space-y-1">
+                    {dayLessons.slice(0, 2).map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditLesson(l);
+                        }}
+                        className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition
+                          ${l.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"}`}
+                      >
+                        {l.time} · {l.title}
+                      </button>
+                    ))}
+                    {dayLessons.length > 2 && <div className="text-[11px] text-gray-400">+{dayLessons.length - 2} ещё</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <WeekView cursor={cursor} lessons={lessons} onDayClick={openAdd} onLessonClick={setEditLesson} />
+        </Card>
+      )}
+
+      <StudentBalances students={students} setStudents={setStudents} lessons={lessons} />
 
       {showAdd && <AddLessonModal date={addDate} students={students} groups={groups} onClose={() => setShowAdd(false)} onSave={addLesson} />}
 
@@ -154,6 +233,17 @@ export function ScheduleView({ lessons, setLessons, students, groups, showToast 
           onClose={() => setEditLesson(null)}
           onSave={saveLessonEdit}
           onCancelLesson={() => cancelLessonEdit(editLesson.id)}
+        />
+      )}
+
+      {showTemplate && (
+        <WeeklyTemplateModal
+          slots={weeklyTemplate}
+          setSlots={setWeeklyTemplate}
+          students={students}
+          groups={groups}
+          onClose={() => setShowTemplate(false)}
+          onApply={applyWeeklyTemplate}
         />
       )}
     </div>

@@ -1,4 +1,8 @@
-export type Subscription = { remaining: number } | null;
+export interface Subscription {
+  total: number;
+  remaining: number;
+  startDate: string;
+}
 
 export interface Student {
   id: string;
@@ -11,8 +15,13 @@ export interface Student {
   favorite: boolean;
   color: string | null;
   note: string;
-  subscription: Subscription;
+  subscription: Subscription | null;
   joinedAt: string;
+  birthDate?: string;
+  city?: string;
+  school?: string;
+  timezone?: string;
+  goal?: string;
 }
 
 export interface Group {
@@ -79,6 +88,17 @@ export interface MethodNote {
   subject: string;
   content: string;
   updatedAt: number;
+}
+
+export interface WeeklyTemplateSlot {
+  id: string;
+  weekday: number; // 0=Mon..6=Sun
+  time: string;
+  duration: number;
+  price: number;
+  studentId?: string;
+  groupId?: string;
+  title: string;
 }
 
 export type ViewId =

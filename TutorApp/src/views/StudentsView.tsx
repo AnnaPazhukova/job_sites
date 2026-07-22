@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Phone, Plus, Search, Settings as SettingsIcon, Star, Trash2, User, UsersRound, Wallet } from "lucide-react";
+import { Calendar as CalendarIcon, Mail, MapPin, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, Select, TextInput } from "../components/ui";
 import { fmtMoney, SUBJECTS, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
@@ -37,7 +37,18 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
       (s.email || "").toLowerCase().includes(query.toLowerCase())
   );
 
-  function addStudent(data: { name: string; subject: string; phone: string; email: string; rate: number }) {
+  function addStudent(data: {
+    name: string;
+    subject: string;
+    phone: string;
+    email: string;
+    rate: number;
+    birthDate: string;
+    city: string;
+    school: string;
+    timezone: string;
+    goal: string;
+  }) {
     const student: Student = {
       id: uid(),
       favorite: false,
@@ -147,39 +158,76 @@ function AddStudentModal({
   onSave,
 }: {
   onClose: () => void;
-  onSave: (data: { name: string; subject: string; phone: string; email: string; rate: number }) => void;
+  onSave: (data: {
+    name: string;
+    subject: string;
+    phone: string;
+    email: string;
+    rate: number;
+    birthDate: string;
+    city: string;
+    school: string;
+    timezone: string;
+    goal: string;
+  }) => void;
 }) {
   const [name, setName] = useState("");
   const [subject, setSubject] = useState(SUBJECTS[0]);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [rate, setRate] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [city, setCity] = useState("");
+  const [school, setSchool] = useState("");
+  const [timezone, setTimezone] = useState("МСК +0");
+  const [goal, setGoal] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), subject, phone, email, rate: Number(rate) || 0 });
+    onSave({ name: name.trim(), subject, phone, email, rate: Number(rate) || 0, birthDate, city, school, timezone, goal });
   }
 
   return (
-    <Modal title="Новый ученик" onClose={onClose}>
+    <Modal title="Новый ученик" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Имя и фамилия">
           <TextInput icon={User} required value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Иван Петров" />
         </Field>
-        <Field label="Предмет">
-          <Select value={subject} onChange={setSubject} options={SUBJECTS} />
-        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Телефон">
-            <TextInput icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7..." />
+          <Field label="Предмет">
+            <Select value={subject} onChange={setSubject} options={SUBJECTS} />
           </Field>
           <Field label="Стоимость занятия, ₽">
             <TextInput icon={Wallet} type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1500" />
           </Field>
         </div>
-        <Field label="E-mail">
-          <TextInput icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@mail.ru" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Телефон">
+            <TextInput icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7..." />
+          </Field>
+          <Field label="E-mail">
+            <TextInput icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@mail.ru" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Дата рождения">
+            <TextInput icon={CalendarIcon} type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          </Field>
+          <Field label="Часовой пояс">
+            <TextInput value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="МСК +0" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Город">
+            <TextInput icon={MapPin} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Москва" />
+          </Field>
+          <Field label="Учебное заведение">
+            <TextInput icon={School} value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Лицей №9" />
+          </Field>
+        </div>
+        <Field label="Цель занятий">
+          <TextInput icon={Target} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Сдать ЕГЭ на 90+ баллов" />
         </Field>
         <PrimaryButton type="submit" full>
           Добавить ученика

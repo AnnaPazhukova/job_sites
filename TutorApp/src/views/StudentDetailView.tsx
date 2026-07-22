@@ -1,13 +1,17 @@
 import { useState } from "react";
 import {
+  Cake,
   Calendar as CalendarIcon,
   Check,
   ChevronLeft,
   Clock,
   Mail,
+  MapPin,
   MessageCircle,
   Plus,
+  School,
   Star,
+  Target,
   User,
   Users,
   Wallet,
@@ -129,11 +133,30 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
             <Field label="ФИО">
               <TextInput icon={User} value={student.name} onChange={(e) => save({ name: e.target.value })} />
             </Field>
-            <Field label="Дата заведения">
-              <TextInput icon={CalendarIcon} value={fmtDateRu(student.joinedAt)} readOnly />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Дата заведения">
+                <TextInput icon={CalendarIcon} value={fmtDateRu(student.joinedAt)} readOnly />
+              </Field>
+              <Field label="Дата рождения">
+                <TextInput icon={Cake} type="date" value={student.birthDate || ""} onChange={(e) => save({ birthDate: e.target.value })} />
+              </Field>
+            </div>
             <Field label="E-mail">
               <TextInput icon={Mail} type="email" value={student.email || ""} onChange={(e) => save({ email: e.target.value })} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Город">
+                <TextInput icon={MapPin} value={student.city || ""} onChange={(e) => save({ city: e.target.value })} placeholder="Москва" />
+              </Field>
+              <Field label="Часовой пояс">
+                <TextInput value={student.timezone || ""} onChange={(e) => save({ timezone: e.target.value })} placeholder="МСК +0" />
+              </Field>
+            </div>
+            <Field label="Учебное заведение">
+              <TextInput icon={School} value={student.school || ""} onChange={(e) => save({ school: e.target.value })} placeholder="Лицей №9" />
+            </Field>
+            <Field label="Цель занятий">
+              <TextInput icon={Target} value={student.goal || ""} onChange={(e) => save({ goal: e.target.value })} placeholder="Сдать ЕГЭ на 90+ баллов" />
             </Field>
           </div>
 
@@ -176,14 +199,38 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
                 </button>
               </div>
             </div>
-            <ToggleRow label="Абонемент" checked={!!student.subscription} onChange={(v) => save({ subscription: v ? { remaining: 8 } : null })} />
+            <ToggleRow
+              label="Абонемент"
+              checked={!!student.subscription}
+              onChange={(v) => save({ subscription: v ? { total: 8, remaining: 8, startDate: TODAY_KEY } : null })}
+            />
             {student.subscription ? (
-              <TextInput
-                type="number"
-                value={student.subscription.remaining}
-                onChange={(e) => save({ subscription: { remaining: Number(e.target.value) || 0 } })}
-                placeholder="Осталось занятий"
-              />
+              <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-2">
+                <div className="text-xs text-gray-500">Абонемент от {fmtDateRu(student.subscription.startDate)}</div>
+                <div className="flex items-center justify-between text-sm font-medium">
+                  <span>
+                    {student.subscription.total - student.subscription.remaining} из {student.subscription.total} уроков использовано
+                  </span>
+                  <span className="text-[#2563EB]">{student.subscription.remaining} осталось</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full bg-[#2563EB]"
+                    style={{ width: `${Math.min(100, (100 * (student.subscription.total - student.subscription.remaining)) / (student.subscription.total || 1))}%` }}
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <GhostButton
+                    full
+                    onClick={() => save({ subscription: { ...student.subscription!, remaining: Math.max(0, student.subscription!.remaining - 1) } })}
+                  >
+                    Списать занятие
+                  </GhostButton>
+                  <GhostButton full onClick={() => save({ subscription: { total: 8, remaining: 8, startDate: TODAY_KEY } })}>
+                    Новый абонемент
+                  </GhostButton>
+                </div>
+              </div>
             ) : (
               <div className="px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm text-gray-400">Нет абонемента</div>
             )}

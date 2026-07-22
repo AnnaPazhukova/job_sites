@@ -15,7 +15,7 @@ import {
 import { useStore } from "./lib/storage";
 import { TODAY_KEY } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId, WeeklyTemplateSlot } from "./lib/types";
 
 import { StudentsView } from "./views/StudentsView";
 import { StudentDetailPage } from "./views/StudentDetailView";
@@ -51,6 +51,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   const [students, setStudents, studentsLoaded] = useStore<Student[]>("students", []);
   const [groups, setGroups] = useStore<Group[]>("groups", []);
   const [lessons, setLessons] = useStore<Lesson[]>("lessons", []);
+  const [weeklyTemplate, setWeeklyTemplate] = useStore<WeeklyTemplateSlot[]>("weekly-template", []);
   const [homework, setHomework] = useStore<Homework[]>("homework", []);
   const [messages, setMessages] = useStore<MessagesByStudent>("messages", {});
   const [tasks, saveTasks] = useStore<Task[]>("tasks", []);
@@ -176,7 +177,18 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                 />
               )}
               {view === "groups" && <GroupsView groups={groups} setGroups={setGroups} students={students} showToast={showToast} />}
-              {view === "schedule" && <ScheduleView lessons={lessons} setLessons={setLessons} students={students} groups={groups} showToast={showToast} />}
+              {view === "schedule" && (
+                <ScheduleView
+                  lessons={lessons}
+                  setLessons={setLessons}
+                  students={students}
+                  setStudents={setStudents}
+                  groups={groups}
+                  weeklyTemplate={weeklyTemplate}
+                  setWeeklyTemplate={setWeeklyTemplate}
+                  showToast={showToast}
+                />
+              )}
               {view === "messages" && <MessagesView students={students} messages={messages} setMessages={setMessages} />}
               {view === "homework" && <HomeworkView homework={homework} setHomework={setHomework} students={students} showToast={showToast} />}
               {view === "tasks" && <TasksView tasks={tasks} saveTasks={saveTasks} showToast={showToast} />}
