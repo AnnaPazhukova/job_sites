@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { X, type LucideIcon } from "lucide-react";
-import { colorFor, initials } from "../lib/utils";
+import { colorFor, initials, LESSON_DURATIONS } from "../lib/utils";
 
 export function Card({
   children,
@@ -237,5 +237,24 @@ export function Pill({ children, tone = "default" }: { children: ReactNode; tone
     <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] tracking-wide uppercase font-semibold ${PILL_TONES[tone]}`}>
       {children}
     </span>
+  );
+}
+
+export function DurationPicker({ value, onChange }: { value: number; onChange: (minutes: number) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {LESSON_DURATIONS.map((d) => (
+        <button
+          key={d.minutes}
+          type="button"
+          onClick={() => onChange(d.minutes)}
+          className={`py-2.5 rounded-xl text-sm font-medium border transition ${
+            value === d.minutes ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"
+          }`}
+        >
+          {d.label}
+        </button>
+      ))}
+    </div>
   );
 }

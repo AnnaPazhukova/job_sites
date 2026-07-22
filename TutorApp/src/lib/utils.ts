@@ -6,10 +6,15 @@ export const MONTHS_RU = [
 ];
 export const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-export const SUBJECTS = [
-  "Математика", "Алгебра", "Геометрия", "Русский язык", "Физика",
-  "Химия", "Английский язык", "Обществознание", "Информатика", "Биология",
+export const LESSON_DURATIONS: { minutes: number; label: string }[] = [
+  { minutes: 45, label: "45 мин" },
+  { minutes: 60, label: "1 час" },
+  { minutes: 90, label: "1,5 часа" },
 ];
+
+export function durationLabel(minutes: number) {
+  return LESSON_DURATIONS.find((d) => d.minutes === minutes)?.label || `${minutes} мин`;
+}
 
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
 

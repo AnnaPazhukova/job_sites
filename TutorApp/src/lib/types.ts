@@ -7,7 +7,8 @@ export interface Subscription {
 export interface Student {
   id: string;
   name: string;
-  subject: string;
+  firstName: string;
+  lastName: string;
   phone?: string;
   email?: string;
   rate: number;

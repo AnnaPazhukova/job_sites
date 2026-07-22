@@ -17,7 +17,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, EmptyState, Field, GhostButton, Modal, PrimaryButton, TextInput, ToggleRow } from "../components/ui";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, TextInput, ToggleRow } from "../components/ui";
 import { dateKey, fmtDateRu, TODAY_KEY, uid } from "../lib/utils";
 import type { Homework, Lesson, Student, ViewId } from "../lib/types";
 
@@ -130,9 +130,21 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
 
         <div className="grid lg:grid-cols-2 gap-x-8 gap-y-4">
           <div className="space-y-4">
-            <Field label="ФИО">
-              <TextInput icon={User} value={student.name} onChange={(e) => save({ name: e.target.value })} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Имя">
+                <TextInput
+                  icon={User}
+                  value={student.firstName || ""}
+                  onChange={(e) => save({ firstName: e.target.value, name: `${e.target.value} ${student.lastName || ""}`.trim() })}
+                />
+              </Field>
+              <Field label="Фамилия">
+                <TextInput
+                  value={student.lastName || ""}
+                  onChange={(e) => save({ lastName: e.target.value, name: `${student.firstName || ""} ${e.target.value}`.trim() })}
+                />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Дата заведения">
                 <TextInput icon={CalendarIcon} value={fmtDateRu(student.joinedAt)} readOnly />
@@ -162,14 +174,12 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
 
           <div className="space-y-4">
             <div className="font-bold text-xl mb-1">Оплата</div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Стоимость">
-                <TextInput icon={Wallet} type="number" value={student.rate || 0} onChange={(e) => save({ rate: Number(e.target.value) || 0 })} />
-              </Field>
-              <Field label="Длительность">
-                <TextInput type="number" value={student.duration || 60} onChange={(e) => save({ duration: Number(e.target.value) || 60 })} />
-              </Field>
-            </div>
+            <Field label="Стоимость, ₽">
+              <TextInput icon={Wallet} type="number" value={student.rate || 0} onChange={(e) => save({ rate: Number(e.target.value) || 0 })} />
+            </Field>
+            <Field label="Время проведения урока">
+              <DurationPicker value={student.duration || 60} onChange={(minutes) => save({ duration: minutes })} />
+            </Field>
             <Field label="Заметка об ученике">
               <textarea
                 value={student.note || ""}

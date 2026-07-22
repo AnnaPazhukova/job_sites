@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Calendar as CalendarIcon, Mail, MapPin, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
-import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, Select, TextInput } from "../components/ui";
-import { fmtMoney, SUBJECTS, TODAY_KEY, uid } from "../lib/utils";
+import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
+import { durationLabel, fmtMoney, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
 
 // Positive balance = prepaid credit (paid lessons still in the future).
@@ -38,30 +38,32 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
   );
 
   function addStudent(data: {
-    name: string;
-    subject: string;
+    firstName: string;
+    lastName: string;
     phone: string;
     email: string;
     rate: number;
+    duration: number;
     birthDate: string;
     city: string;
     school: string;
     timezone: string;
     goal: string;
   }) {
+    const name = `${data.firstName} ${data.lastName}`.trim();
     const student: Student = {
       id: uid(),
       favorite: false,
       color: null,
       note: "",
-      duration: 60,
       subscription: null,
       joinedAt: TODAY_KEY,
       ...data,
+      name,
     };
     setStudents([student, ...students]);
     setShowAdd(false);
-    showToast(`Ученик «${data.name}» добавлен`);
+    showToast(`Ученик «${name}» добавлен`);
   }
 
   function removeStudent(id: string) {
@@ -122,7 +124,7 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
                       {s.name}
                       {s.favorite && <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{s.subject}</div>
+                    <div className="text-xs text-gray-500 truncate">{durationLabel(s.duration)}</div>
                   </div>
                   <span
                     className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0
@@ -159,11 +161,12 @@ function AddStudentModal({
 }: {
   onClose: () => void;
   onSave: (data: {
-    name: string;
-    subject: string;
+    firstName: string;
+    lastName: string;
     phone: string;
     email: string;
     rate: number;
+    duration: number;
     birthDate: string;
     city: string;
     school: string;
@@ -171,11 +174,12 @@ function AddStudentModal({
     goal: string;
   }) => void;
 }) {
-  const [name, setName] = useState("");
-  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [rate, setRate] = useState("");
+  const [duration, setDuration] = useState(60);
   const [birthDate, setBirthDate] = useState("");
   const [city, setCity] = useState("");
   const [school, setSchool] = useState("");
@@ -184,38 +188,38 @@ function AddStudentModal({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    onSave({ name: name.trim(), subject, phone, email, rate: Number(rate) || 0, birthDate, city, school, timezone, goal });
+    if (!firstName.trim() && !lastName.trim()) return;
+    onSave({ firstName: firstName.trim(), lastName: lastName.trim(), phone, email, rate: Number(rate) || 0, duration, birthDate, city, school, timezone, goal });
   }
 
   return (
     <Modal title="Новый ученик" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Имя и фамилия">
-          <TextInput icon={User} required value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Иван Петров" />
-        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Предмет">
-            <Select value={subject} onChange={setSubject} options={SUBJECTS} />
+          <Field label="Имя">
+            <TextInput icon={User} required value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Иван" />
           </Field>
-          <Field label="Стоимость занятия, ₽">
-            <TextInput icon={Wallet} type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1500" />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Телефон">
-            <TextInput icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7..." />
-          </Field>
-          <Field label="E-mail">
-            <TextInput icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@mail.ru" />
+          <Field label="Фамилия">
+            <TextInput value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Петров" />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Дата рождения">
             <TextInput icon={CalendarIcon} type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           </Field>
-          <Field label="Часовой пояс">
-            <TextInput value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="МСК +0" />
+          <Field label="Стоимость занятия, ₽">
+            <TextInput icon={Wallet} type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1500" />
+          </Field>
+        </div>
+        <Field label="Время проведения урока">
+          <DurationPicker value={duration} onChange={setDuration} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Телефон">
+            <TextInput icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7..." />
+          </Field>
+          <Field label="E-mail">
+            <TextInput icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@mail.ru" />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -226,9 +230,14 @@ function AddStudentModal({
             <TextInput icon={School} value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Лицей №9" />
           </Field>
         </div>
-        <Field label="Цель занятий">
-          <TextInput icon={Target} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Сдать ЕГЭ на 90+ баллов" />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Часовой пояс">
+            <TextInput value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="МСК +0" />
+          </Field>
+          <Field label="Цель занятий">
+            <TextInput icon={Target} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Сдать ЕГЭ на 90+ баллов" />
+          </Field>
+        </div>
         <PrimaryButton type="submit" full>
           Добавить ученика
         </PrimaryButton>
