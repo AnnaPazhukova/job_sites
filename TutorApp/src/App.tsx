@@ -27,13 +27,13 @@ import { TasksView } from "./views/TasksView";
 import { NotesView } from "./views/NotesView";
 import { StatsView } from "./views/StatsView";
 
-const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon }[] = [
+const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon; disabled?: boolean }[] = [
   { id: "students", label: "Мои ученики", icon: Users },
   { id: "groups", label: "Группы", icon: UsersRound },
   { id: "schedule", label: "Расписание", icon: Calendar },
   { id: "messages", label: "Сообщения", icon: MessageCircle },
   { id: "homework", label: "Проверка ДЗ", icon: BookOpen },
-  { id: "tasks", label: "База заданий", icon: BookOpen },
+  { id: "tasks", label: "База заданий", icon: BookOpen, disabled: true },
   { id: "notes", label: "Методика", icon: Layers },
   { id: "stats", label: "Статистика", icon: TrendingUp },
 ];
@@ -64,6 +64,12 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   }, []);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+
+  const openNote = useCallback((id: string) => {
+    setActiveNoteId(id);
+    setView("notes");
+  }, []);
 
   // Seed the task bank & methodology library once, on first run.
   useEffect(() => {
@@ -129,6 +135,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                 item={item}
                 active={view === item.id || (view === "student-detail" && item.id === "students")}
                 onClick={() => {
+                  if (item.disabled) return;
                   setView(item.id);
                   setSidebarOpen(false);
                 }}
@@ -190,9 +197,20 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                 />
               )}
               {view === "messages" && <MessagesView students={students} messages={messages} setMessages={setMessages} />}
-              {view === "homework" && <HomeworkView homework={homework} setHomework={setHomework} students={students} showToast={showToast} />}
+              {view === "homework" && (
+                <HomeworkView
+                  homework={homework}
+                  setHomework={setHomework}
+                  students={students}
+                  notes={notes}
+                  onOpenNote={openNote}
+                  showToast={showToast}
+                />
+              )}
               {view === "tasks" && <TasksView tasks={tasks} saveTasks={saveTasks} showToast={showToast} />}
-              {view === "notes" && <NotesView notes={notes} saveNotes={saveNotes} tasks={tasks} showToast={showToast} />}
+              {view === "notes" && (
+                <NotesView notes={notes} saveNotes={saveNotes} tasks={tasks} showToast={showToast} activeId={activeNoteId} setActiveId={setActiveNoteId} />
+              )}
               {view === "stats" && <StatsView lessons={lessons} students={students} homework={homework} tasks={tasks} notes={notes} />}
             </>
           )}
@@ -212,16 +230,26 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   );
 }
 
-function NavButton({ item, active, onClick }: { item: { id: ViewId; label: string; icon: LucideIcon }; active: boolean; onClick: () => void }) {
+function NavButton({
+  item,
+  active,
+  onClick,
+}: {
+  item: { id: ViewId; label: string; icon: LucideIcon; disabled?: boolean };
+  active: boolean;
+  onClick: () => void;
+}) {
   const Icon = item.icon;
   return (
     <button
       onClick={onClick}
+      disabled={item.disabled}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-[15px] font-medium
-        ${active ? "bg-[#EEF2FF] text-[#2563EB]" : "text-[#4B5563] hover:bg-gray-50"}`}
+        ${item.disabled ? "text-gray-300 cursor-not-allowed" : active ? "bg-[#EEF2FF] text-[#2563EB]" : "text-[#4B5563] hover:bg-gray-50"}`}
     >
       <Icon size={19} strokeWidth={2} />
       {item.label}
+      {item.disabled && <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-300">Скоро</span>}
     </button>
   );
 }
