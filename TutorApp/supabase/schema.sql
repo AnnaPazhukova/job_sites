@@ -22,3 +22,20 @@ create policy "update own data" on public.app_kv
 
 create policy "delete own data" on public.app_kv
   for delete using (auth.uid() = user_id);
+
+-- File attachments (homework, methodology lessons): one public bucket,
+-- files stored under a per-user folder (<user_id>/...), writable only by
+-- their owner. Public read keeps download links simple (no signed URLs to
+-- refresh); nothing sensitive should be uploaded here.
+insert into storage.buckets (id, name, public)
+values ('attachments', 'attachments', true)
+on conflict (id) do nothing;
+
+create policy "read attachments" on storage.objects
+  for select using (bucket_id = 'attachments');
+
+create policy "upload own attachments" on storage.objects
+  for insert with check (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "delete own attachments" on storage.objects
+  for delete using (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);

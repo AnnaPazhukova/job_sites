@@ -48,6 +48,14 @@ export interface Lesson {
 
 export type HomeworkStatus = "pending" | "done";
 
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface Homework {
   id: string;
   studentId: string;
@@ -55,6 +63,8 @@ export interface Homework {
   title: string;
   due: string | null;
   status: HomeworkStatus;
+  noteId?: string;
+  attachments?: Attachment[];
 }
 
 export interface ChatMessage {
@@ -81,12 +91,21 @@ export interface Task {
   createdAt: number;
 }
 
+export type MethodNoteTabKey = "theory" | "rules" | "tasks" | "test" | "homework";
+
+export type MethodNoteTabs = Record<MethodNoteTabKey, string>;
+
+export type MethodNoteAttachments = Partial<Record<MethodNoteTabKey, Attachment[]>>;
+
 export interface MethodNote {
   id: string;
   topic: string;
   grade: string;
   subject: string;
-  content: string;
+  /** @deprecated legacy flat notes; new notes use `tabs` instead */
+  content?: string;
+  tabs?: MethodNoteTabs;
+  attachments?: MethodNoteAttachments;
   updatedAt: number;
 }
 
