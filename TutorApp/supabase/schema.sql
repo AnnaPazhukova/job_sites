@@ -39,3 +39,230 @@ create policy "upload own attachments" on storage.objects
 
 create policy "delete own attachments" on storage.objects
   for delete using (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Student portal: a student gets their own Supabase Auth account, linked to
+-- one student record inside the tutor's data via an invite code. The tutor's
+-- app_kv rows stay owned/RLS-scoped by the tutor as before; students never
+-- get direct access to app_kv. Instead, SECURITY DEFINER functions below
+-- read the tutor's row internally and hand back only the slice that matches
+-- the student's own id, so a logged-in student can never see another
+-- student's lessons, homework, or messages.
+
+create table if not exists public.student_invites (
+  code text primary key,
+  tutor_id uuid not null references auth.users (id) on delete cascade,
+  student_id text not null,
+  used boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.student_invites enable row level security;
+
+create policy "tutor manages own invites" on public.student_invites
+  for all using (auth.uid() = tutor_id) with check (auth.uid() = tutor_id);
+
+create table if not exists public.student_accounts (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  tutor_id uuid not null references auth.users (id) on delete cascade,
+  student_id text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.student_accounts enable row level security;
+
+create policy "student reads own link" on public.student_accounts
+  for select using (auth.uid() = user_id);
+
+create policy "tutor reads own students' links" on public.student_accounts
+  for select using (auth.uid() = tutor_id);
+
+-- Called by a student right after supabase.auth.signUp() using the code from
+-- their invite link. Links their new auth account to the student record and
+-- marks the invite used so it can't be replayed.
+create or replace function public.claim_student_invite(p_code text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tutor uuid;
+  v_student text;
+  v_used boolean;
+begin
+  select tutor_id, student_id, used into v_tutor, v_student, v_used
+  from public.student_invites where code = p_code;
+
+  if v_tutor is null then
+    raise exception 'Неверный код приглашения';
+  end if;
+  if v_used then
+    raise exception 'Код приглашения уже использован';
+  end if;
+
+  insert into public.student_accounts (user_id, tutor_id, student_id)
+  values (auth.uid(), v_tutor, v_student)
+  on conflict (user_id) do update set tutor_id = excluded.tutor_id, student_id = excluded.student_id;
+
+  update public.student_invites set used = true where code = p_code;
+end;
+$$;
+
+grant execute on function public.claim_student_invite(text) to authenticated;
+
+-- Returns just the caller's own slice of a given data key ('students',
+-- 'lessons', 'homework', or 'messages'), read from their linked tutor's
+-- app_kv row. Anything not matching the student's id is filtered out inside
+-- this function, before it ever leaves the database.
+create or replace function public.student_get_data(p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tutor uuid;
+  v_student text;
+  v_value jsonb;
+  v_filtered jsonb;
+begin
+  select tutor_id, student_id into v_tutor, v_student
+  from public.student_accounts where user_id = auth.uid();
+
+  if v_tutor is null then
+    raise exception 'Аккаунт не привязан к ученику';
+  end if;
+
+  -- Notes referenced by the student's own homework: read both slices and
+  -- keep only methodology notes whose id shows up as a noteId on one of
+  -- this student's homework items. The rest of the methodology library
+  -- (the tutor's other lesson notes) never leaves the database.
+  if p_key = 'linked-notes' then
+    declare
+      v_hw jsonb;
+      v_note_ids text[];
+    begin
+      select value into v_hw from public.app_kv where user_id = v_tutor and key = 'homework';
+      select coalesce(array_agg(distinct elem->>'noteId'), array[]::text[]) into v_note_ids
+      from jsonb_array_elements(coalesce(v_hw, '[]'::jsonb)) elem
+      where elem->>'studentId' = v_student and elem->>'noteId' is not null;
+
+      select value into v_value from public.app_kv where user_id = v_tutor and key = 'methodology-notes';
+      select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_filtered
+      from jsonb_array_elements(coalesce(v_value, '[]'::jsonb)) elem
+      where elem->>'id' = any(v_note_ids);
+
+      return v_filtered;
+    end;
+  end if;
+
+  select value into v_value from public.app_kv where user_id = v_tutor and key = p_key;
+  if v_value is null then
+    return '[]'::jsonb;
+  end if;
+
+  if p_key in ('lessons', 'homework') then
+    select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_filtered
+    from jsonb_array_elements(v_value) elem
+    where elem->>'studentId' = v_student;
+  elsif p_key = 'students' then
+    select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_filtered
+    from jsonb_array_elements(v_value) elem
+    where elem->>'id' = v_student;
+  elsif p_key = 'messages' then
+    v_filtered := coalesce(v_value->v_student, '[]'::jsonb);
+  else
+    v_filtered := '[]'::jsonb;
+  end if;
+
+  return v_filtered;
+end;
+$$;
+
+grant execute on function public.student_get_data(text) to authenticated;
+
+-- Appends a "from: student" chat message into the tutor's messages blob,
+-- under the caller's own student id only.
+create or replace function public.student_send_message(p_text text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tutor uuid;
+  v_student text;
+  v_value jsonb;
+  v_thread jsonb;
+  v_message jsonb;
+begin
+  select tutor_id, student_id into v_tutor, v_student
+  from public.student_accounts where user_id = auth.uid();
+
+  if v_tutor is null then
+    raise exception 'Аккаунт не привязан к ученику';
+  end if;
+  if coalesce(trim(p_text), '') = '' then
+    raise exception 'Пустое сообщение';
+  end if;
+
+  select value into v_value from public.app_kv where user_id = v_tutor and key = 'messages';
+  v_value := coalesce(v_value, '{}'::jsonb);
+  v_thread := coalesce(v_value->v_student, '[]'::jsonb);
+
+  v_message := jsonb_build_object(
+    'id', gen_random_uuid()::text,
+    'from', 'student',
+    'text', p_text,
+    'at', (extract(epoch from now()) * 1000)::bigint
+  );
+
+  v_value := jsonb_set(v_value, array[v_student], v_thread || jsonb_build_array(v_message), true);
+
+  insert into public.app_kv (user_id, key, value, updated_at)
+  values (v_tutor, 'messages', v_value, now())
+  on conflict (user_id, key) do update set value = excluded.value, updated_at = excluded.updated_at;
+end;
+$$;
+
+grant execute on function public.student_send_message(text) to authenticated;
+
+-- Marks one of the caller's own homework items as done.
+create or replace function public.student_mark_homework_done(p_homework_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tutor uuid;
+  v_student text;
+  v_value jsonb;
+  v_next jsonb;
+begin
+  select tutor_id, student_id into v_tutor, v_student
+  from public.student_accounts where user_id = auth.uid();
+
+  if v_tutor is null then
+    raise exception 'Аккаунт не привязан к ученику';
+  end if;
+
+  select value into v_value from public.app_kv where user_id = v_tutor and key = 'homework';
+  if v_value is null then
+    return;
+  end if;
+
+  select coalesce(jsonb_agg(
+    case
+      when elem->>'id' = p_homework_id and elem->>'studentId' = v_student
+      then jsonb_set(elem, '{status}', '"done"')
+      else elem
+    end
+  ), '[]'::jsonb) into v_next
+  from jsonb_array_elements(v_value) elem;
+
+  update public.app_kv set value = v_next, updated_at = now() where user_id = v_tutor and key = 'homework';
+end;
+$$;
+
+grant execute on function public.student_mark_homework_done(text) to authenticated;

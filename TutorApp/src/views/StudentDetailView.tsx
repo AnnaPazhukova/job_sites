@@ -5,6 +5,8 @@ import {
   Check,
   ChevronLeft,
   Clock,
+  Copy,
+  KeyRound,
   Mail,
   MessageCircle,
   Plus,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, Select, TextInput, ToggleRow } from "../components/ui";
 import { dateKey, fmtDateRu, GRADES, TODAY_KEY, uid } from "../lib/utils";
+import { createInvite, inviteLink, studentPortalEnabled } from "../lib/studentAuth";
 import type { Homework, Lesson, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -37,6 +40,10 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
   const student = students.find((s) => s.id === selectedStudentId);
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
+  const [invite, setInvite] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   if (!student) {
     return (
@@ -57,6 +64,31 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
     setStudents(students.filter((s) => s.id !== student!.id));
     showToast("Ученик исключён из списка");
     setView("students");
+  }
+
+  async function handleInvite() {
+    setInviteBusy(true);
+    setInviteError(null);
+    setCopied(false);
+    try {
+      const code = await createInvite(student!.id);
+      setInvite(code);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Не удалось создать приглашение");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!invite) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink(invite));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setInviteError("Не удалось скопировать ссылку");
+    }
   }
 
   const studentLessons = lessons
@@ -122,10 +154,40 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
       <Card className="p-5 sm:p-6 mb-5">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div className="font-bold text-xl">Основная информация</div>
-          <PrimaryButton icon={MessageCircle} onClick={() => setView("messages")}>
-            Написать
-          </PrimaryButton>
+          <div className="flex items-center gap-2 flex-wrap">
+            {studentPortalEnabled && (
+              <GhostButton icon={KeyRound} onClick={handleInvite} disabled={inviteBusy}>
+                {inviteBusy ? "Создаём…" : "Пригласить в кабинет"}
+              </GhostButton>
+            )}
+            <PrimaryButton icon={MessageCircle} onClick={() => setView("messages")}>
+              Написать
+            </PrimaryButton>
+          </div>
         </div>
+
+        {(invite || inviteError) && (
+          <div className="mb-5 rounded-xl border border-[#E7E9EE] bg-[#F7F8FA] px-4 py-3">
+            {inviteError ? (
+              <div className="text-sm text-red-600">{inviteError}</div>
+            ) : (
+              <>
+                <div className="text-xs text-gray-500 mb-1.5">
+                  Отправьте эту ссылку ученику — по ней он зарегистрирует личный кабинет и увидит своё расписание, переписку и домашние задания.
+                </div>
+                <div className="flex items-center gap-2">
+                  <TextInput readOnly value={inviteLink(invite!)} className="text-xs" />
+                  <button
+                    onClick={copyInviteLink}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 transition"
+                  >
+                    <Copy size={14} /> {copied ? "Скопировано" : "Копировать"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-x-8 gap-y-4">
           <div className="space-y-4">
