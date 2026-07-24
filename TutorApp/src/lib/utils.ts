@@ -8,6 +8,8 @@ export const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "В�
 
 export const GRADES = ["5 класс", "6 класс", "7 класс", "8 класс", "9 класс", "10 класс", "11 класс"];
 
+export const SUBSCRIPTION_SIZES = [2, 4, 6, 8, 12];
+
 export const LESSON_DURATIONS: { minutes: number; label: string }[] = [
   { minutes: 45, label: "45 мин" },
   { minutes: 60, label: "1 час" },
@@ -16,6 +18,11 @@ export const LESSON_DURATIONS: { minutes: number; label: string }[] = [
 
 export function durationLabel(minutes: number) {
   return LESSON_DURATIONS.find((d) => d.minutes === minutes)?.label || `${minutes} мин`;
+}
+
+export function lessonPillStyle(color: string | null | undefined): { background: string; color: string } | undefined {
+  if (!color) return undefined;
+  return { background: color + "1A", color };
 }
 
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
@@ -54,4 +61,62 @@ export const TODAY_KEY = dateKey(TODAY);
 
 export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
+}
+
+export type RecurrenceFreq = "daily" | "weekly" | "monthly";
+export type RecurrenceEnd = "count" | "until" | "endless";
+
+export function buildRecurringDates(
+  startDate: string,
+  freq: RecurrenceFreq,
+  weekdays: number[],
+  endType: RecurrenceEnd,
+  count: number,
+  untilDate: string
+): string[] {
+  const start = new Date(startDate + "T00:00:00");
+  const out: string[] = [];
+  const cap = 60;
+
+  if (freq === "daily") {
+    const d = new Date(start);
+    let n = 0;
+    while (n < cap) {
+      out.push(dateKey(d));
+      n++;
+      if (endType === "count" && n >= count) break;
+      if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
+      d.setDate(d.getDate() + 1);
+      if (endType === "endless" && n >= 24) break;
+    }
+  } else if (freq === "monthly") {
+    const d = new Date(start);
+    let n = 0;
+    while (n < cap) {
+      out.push(dateKey(d));
+      n++;
+      if (endType === "count" && n >= count) break;
+      if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
+      d.setMonth(d.getMonth() + 1);
+      if (endType === "endless" && n >= 12) break;
+    }
+  } else {
+    const wdSet = weekdays.length ? weekdays : [(start.getDay() + 6) % 7];
+    const d = new Date(start);
+    let n = 0;
+    let guard = 0;
+    while (n < cap && guard < 400) {
+      guard++;
+      const wd = (d.getDay() + 6) % 7;
+      if (wdSet.includes(wd) && d >= start) {
+        out.push(dateKey(d));
+        n++;
+        if (endType === "count" && n >= count) break;
+        if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
+        if (endType === "endless" && n >= 24) break;
+      }
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return out;
 }

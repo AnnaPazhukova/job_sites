@@ -64,6 +64,7 @@ export interface Homework {
   due: string | null;
   status: HomeworkStatus;
   noteId?: string;
+  lessonId?: string;
   attachments?: Attachment[];
 }
 
@@ -72,6 +73,7 @@ export interface ChatMessage {
   from: "me" | "student";
   text: string;
   at: number;
+  attachments?: Attachment[];
 }
 
 export type MessagesByStudent = Record<string, ChatMessage[]>;

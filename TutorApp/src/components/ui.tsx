@@ -1,16 +1,37 @@
 import React, { type ReactNode } from "react";
 import { X, type LucideIcon } from "lucide-react";
-import { colorFor, initials, LESSON_DURATIONS } from "../lib/utils";
+import { colorFor, initials, LESSON_DURATIONS, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
 
 export function Card({
   children,
   className = "",
   style,
+  onClick,
 }: {
   children: ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  onClick?: () => void;
 }) {
+  if (onClick) {
+    return (
+      <div
+        style={style}
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`bg-white rounded-2xl border border-[#E7E9EE] shadow-sm ${className}`}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div style={style} className={`bg-white rounded-2xl border border-[#E7E9EE] shadow-sm ${className}`}>
       {children}
@@ -237,6 +258,128 @@ export function Pill({ children, tone = "default" }: { children: ReactNode; tone
     <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] tracking-wide uppercase font-semibold ${PILL_TONES[tone]}`}>
       {children}
     </span>
+  );
+}
+
+const RECURRENCE_DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+export function RecurrenceFields({
+  recurring,
+  setRecurring,
+  freq,
+  setFreq,
+  days,
+  toggleDay,
+  endType,
+  setEndType,
+  count,
+  setCount,
+  untilDate,
+  setUntilDate,
+}: {
+  recurring: boolean;
+  setRecurring: (v: boolean) => void;
+  freq: RecurrenceFreq;
+  setFreq: (v: RecurrenceFreq) => void;
+  days: number[];
+  toggleDay: (d: number) => void;
+  endType: RecurrenceEnd;
+  setEndType: (v: RecurrenceEnd) => void;
+  count: number;
+  setCount: (v: number) => void;
+  untilDate: string;
+  setUntilDate: (v: string) => void;
+}) {
+  return (
+    <div className="border border-[#E7E9EE] rounded-xl p-4">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <div className="font-medium text-sm">Регулярные занятия</div>
+          <div className="text-xs text-gray-500">Создать серию по расписанию</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setRecurring(!recurring)}
+          className={`w-10 h-6 rounded-full transition relative shrink-0 ${recurring ? "bg-[#2563EB]" : "bg-gray-200"}`}
+        >
+          <span className="absolute top-0.5 w-5 h-5 bg-white rounded-full transition" style={{ left: recurring ? 18 : 2 }} />
+        </button>
+      </div>
+
+      {recurring && (
+        <div className="space-y-4 mt-4">
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["daily", "Ежедневно"],
+                ["weekly", "Еженедельно"],
+                ["monthly", "Ежемесячно"],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setFreq(v)}
+                className={`py-2 rounded-xl text-sm font-medium border transition ${freq === v ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {freq === "weekly" && (
+            <div>
+              <div className="text-sm font-medium text-gray-700 mb-2">Дни повторения</div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {RECURRENCE_DAY_LABELS.map((l, i) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => toggleDay(i)}
+                    className={`py-2 rounded-xl text-xs font-medium border transition ${days.includes(i) ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Окончание серии</div>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ["count", "Количество"],
+                  ["until", "До даты"],
+                  ["endless", "Бессрочно"],
+                ] as const
+              ).map(([v, l]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setEndType(v)}
+                  className={`py-2 rounded-xl text-sm font-medium border transition ${endType === v ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {endType === "count" && (
+            <Field label="Количество занятий">
+              <TextInput type="number" value={count} onChange={(e) => setCount(Number(e.target.value) || 1)} />
+            </Field>
+          )}
+          {endType === "until" && (
+            <Field label="Дата окончания">
+              <TextInput type="date" value={untilDate} onChange={(e) => setUntilDate(e.target.value)} />
+            </Field>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

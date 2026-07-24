@@ -99,6 +99,9 @@ begin
   if v_used then
     raise exception 'Код приглашения уже использован';
   end if;
+  if auth.uid() = v_tutor then
+    raise exception 'Нельзя принять приглашение под аккаунтом репетитора, который его создал';
+  end if;
 
   insert into public.student_accounts (user_id, tutor_id, student_id)
   values (auth.uid(), v_tutor, v_student)
@@ -181,9 +184,16 @@ $$;
 
 grant execute on function public.student_get_data(text) to authenticated;
 
--- Appends a "from: student" chat message into the tutor's messages blob,
+-- Appends a "from: student" chat message (optionally with file
+-- attachments already uploaded to Storage) into the tutor's messages blob,
 -- under the caller's own student id only.
-create or replace function public.student_send_message(p_text text)
+-- Dropped first: adding a parameter changes the function's signature, so
+-- `create or replace` would otherwise leave the old single-argument version
+-- around as an ambiguous overload on databases that ran an earlier version
+-- of this script.
+drop function if exists public.student_send_message(text);
+
+create or replace function public.student_send_message(p_text text, p_attachments jsonb default '[]'::jsonb)
 returns void
 language plpgsql
 security definer
@@ -202,7 +212,7 @@ begin
   if v_tutor is null then
     raise exception 'Аккаунт не привязан к ученику';
   end if;
-  if coalesce(trim(p_text), '') = '' then
+  if coalesce(trim(p_text), '') = '' and jsonb_array_length(coalesce(p_attachments, '[]'::jsonb)) = 0 then
     raise exception 'Пустое сообщение';
   end if;
 
@@ -213,9 +223,12 @@ begin
   v_message := jsonb_build_object(
     'id', gen_random_uuid()::text,
     'from', 'student',
-    'text', p_text,
+    'text', coalesce(p_text, ''),
     'at', (extract(epoch from now()) * 1000)::bigint
   );
+  if jsonb_array_length(coalesce(p_attachments, '[]'::jsonb)) > 0 then
+    v_message := v_message || jsonb_build_object('attachments', p_attachments);
+  end if;
 
   v_value := jsonb_set(v_value, array[v_student], v_thread || jsonb_build_array(v_message), true);
 
@@ -225,7 +238,7 @@ begin
 end;
 $$;
 
-grant execute on function public.student_send_message(text) to authenticated;
+grant execute on function public.student_send_message(text, jsonb) to authenticated;
 
 -- Marks one of the caller's own homework items as done.
 create or replace function public.student_mark_homework_done(p_homework_id text)

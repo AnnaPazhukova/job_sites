@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import type { ChatMessage, Homework, Lesson, MethodNote, Student } from "./types";
+import type { Attachment, ChatMessage, Homework, Lesson, MethodNote, Student } from "./types";
 
 async function getData<T>(key: string): Promise<T> {
   if (!supabase) return [] as unknown as T;
@@ -18,9 +18,9 @@ export async function fetchStudentProfile(): Promise<Student | null> {
   return list[0] || null;
 }
 
-export async function sendStudentMessage(text: string): Promise<void> {
+export async function sendStudentMessage(text: string, attachments: Attachment[] = []): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.rpc("student_send_message", { p_text: text });
+  const { error } = await supabase.rpc("student_send_message", { p_text: text, p_attachments: attachments });
   if (error) throw error;
 }
 

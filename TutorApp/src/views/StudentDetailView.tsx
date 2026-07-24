@@ -18,8 +18,8 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, Select, TextInput, ToggleRow } from "../components/ui";
-import { dateKey, fmtDateRu, GRADES, TODAY_KEY, uid } from "../lib/utils";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, RecurrenceFields, Select, TextInput } from "../components/ui";
+import { buildRecurringDates, fmtDateRu, GRADES, SUBSCRIPTION_SIZES, TODAY_KEY, uid, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
 import { createInvite, inviteLink, studentPortalEnabled } from "../lib/studentAuth";
 import type { Homework, Lesson, Student, ViewId } from "../lib/types";
 
@@ -44,6 +44,7 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showPackagePicker, setShowPackagePicker] = useState(false);
 
   if (!student) {
     return (
@@ -89,6 +90,11 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
     } catch {
       setInviteError("Не удалось скопировать ссылку");
     }
+  }
+
+  function startSubscription(total: number) {
+    save({ subscription: { total, remaining: total, startDate: TODAY_KEY } });
+    setShowPackagePicker(false);
   }
 
   const studentLessons = lessons
@@ -267,41 +273,69 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
                 </button>
               </div>
             </div>
-            <ToggleRow
-              label="Абонемент"
-              checked={!!student.subscription}
-              onChange={(v) => save({ subscription: v ? { total: 8, remaining: 8, startDate: TODAY_KEY } : null })}
-            />
-            {student.subscription ? (
-              <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-2">
-                <div className="text-xs text-gray-500">Абонемент от {fmtDateRu(student.subscription.startDate)}</div>
-                <div className="flex items-center justify-between text-sm font-medium">
-                  <span>
-                    {student.subscription.total - student.subscription.remaining} из {student.subscription.total} уроков использовано
-                  </span>
-                  <span className="text-[#2563EB]">{student.subscription.remaining} осталось</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                  <div
-                    className="h-full bg-[#2563EB]"
-                    style={{ width: `${Math.min(100, (100 * (student.subscription.total - student.subscription.remaining)) / (student.subscription.total || 1))}%` }}
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <GhostButton
-                    full
-                    onClick={() => save({ subscription: { ...student.subscription!, remaining: Math.max(0, student.subscription!.remaining - 1) } })}
+            <div>
+              <div className="text-sm font-medium text-gray-700 mb-2">Абонемент</div>
+              {student.subscription && !showPackagePicker ? (
+                <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-2">
+                  <div className="text-xs text-gray-500">Абонемент от {fmtDateRu(student.subscription.startDate)}</div>
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span>
+                      {student.subscription.total - student.subscription.remaining} из {student.subscription.total} уроков использовано
+                    </span>
+                    <span className="text-[#2563EB]">{student.subscription.remaining} осталось</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-[#2563EB]"
+                      style={{ width: `${Math.min(100, (100 * (student.subscription.total - student.subscription.remaining)) / (student.subscription.total || 1))}%` }}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <GhostButton
+                      full
+                      onClick={() => save({ subscription: { ...student.subscription!, remaining: Math.max(0, student.subscription!.remaining - 1) } })}
+                    >
+                      Списать занятие
+                    </GhostButton>
+                    <GhostButton full onClick={() => setShowPackagePicker(true)}>
+                      Новый абонемент
+                    </GhostButton>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => save({ subscription: null })}
+                    className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2"
                   >
-                    Списать занятие
-                  </GhostButton>
-                  <GhostButton full onClick={() => save({ subscription: { total: 8, remaining: 8, startDate: TODAY_KEY } })}>
-                    Новый абонемент
-                  </GhostButton>
+                    Отключить абонемент
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm text-gray-400">Нет абонемента</div>
-            )}
+              ) : (
+                <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-2">
+                  <div className="text-xs text-gray-500">Сколько занятий в абонементе?</div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {SUBSCRIPTION_SIZES.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => startSubscription(n)}
+                        className="py-2 rounded-lg text-sm font-medium border bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition"
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  {student.subscription && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPackagePicker(false)}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                    >
+                      Отмена
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -439,9 +473,9 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
   const [price, setPrice] = useState(lesson?.price ?? defaultRate ?? 0);
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
   const [recurring, setRecurring] = useState(false);
-  const [freq, setFreq] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
   const [days, setDays] = useState<number[]>([]);
-  const [endType, setEndType] = useState<"count" | "until" | "endless">("count");
+  const [endType, setEndType] = useState<RecurrenceEnd>("count");
   const [count, setCount] = useState(8);
   const [untilDate, setUntilDate] = useState("");
 
@@ -451,50 +485,7 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
 
   function buildOccurrences(): string[] {
     if (!recurring) return [date];
-    const start = new Date(date + "T00:00:00");
-    const out: string[] = [];
-    const cap = 60;
-    if (freq === "daily") {
-      const d = new Date(start);
-      let n = 0;
-      while (n < cap) {
-        out.push(dateKey(d));
-        n++;
-        if (endType === "count" && n >= count) break;
-        if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
-        d.setDate(d.getDate() + 1);
-        if (endType === "endless" && n >= 24) break;
-      }
-    } else if (freq === "monthly") {
-      const d = new Date(start);
-      let n = 0;
-      while (n < cap) {
-        out.push(dateKey(d));
-        n++;
-        if (endType === "count" && n >= count) break;
-        if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
-        d.setMonth(d.getMonth() + 1);
-        if (endType === "endless" && n >= 12) break;
-      }
-    } else {
-      const wdSet = days.length ? days : [(start.getDay() + 6) % 7];
-      const d = new Date(start);
-      let n = 0;
-      let guard = 0;
-      while (n < cap && guard < 400) {
-        guard++;
-        const wd = (d.getDay() + 6) % 7;
-        if (wdSet.includes(wd) && d >= start) {
-          out.push(dateKey(d));
-          n++;
-          if (endType === "count" && n >= count) break;
-          if (endType === "until" && untilDate && dateKey(d) >= untilDate) break;
-          if (endType === "endless" && n >= 24) break;
-        }
-        d.setDate(d.getDate() + 1);
-      }
-    }
-    return out;
+    return buildRecurringDates(date, freq, days, endType, count, untilDate);
   }
 
   function submit(e: React.FormEvent) {
@@ -505,8 +496,6 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
       onSave({ date, time, duration: Number(duration), price: Number(price), occurrences: buildOccurrences() });
     }
   }
-
-  const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
   return (
     <Modal title={isEdit ? "Занятие" : "Добавление занятия"} onClose={onClose} wide>
@@ -550,95 +539,20 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
         </div>
 
         {!isEdit && (
-          <div className="border border-[#E7E9EE] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-1">
-              <div>
-                <div className="font-medium text-sm">Регулярные занятия</div>
-                <div className="text-xs text-gray-500">Создать серию по расписанию</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRecurring((r) => !r)}
-                className={`w-10 h-6 rounded-full transition relative shrink-0 ${recurring ? "bg-[#2563EB]" : "bg-gray-200"}`}
-              >
-                <span className="absolute top-0.5 w-5 h-5 bg-white rounded-full transition" style={{ left: recurring ? 18 : 2 }} />
-              </button>
-            </div>
-
-            {recurring && (
-              <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      ["daily", "Ежедневно"],
-                      ["weekly", "Еженедельно"],
-                      ["monthly", "Ежемесячно"],
-                    ] as const
-                  ).map(([v, l]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setFreq(v)}
-                      className={`py-2 rounded-xl text-sm font-medium border transition ${freq === v ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-
-                {freq === "weekly" && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-700 mb-2">Дни повторения</div>
-                    <div className="grid grid-cols-7 gap-1.5">
-                      {DAY_LABELS.map((l, i) => (
-                        <button
-                          key={l}
-                          type="button"
-                          onClick={() => toggleDay(i)}
-                          className={`py-2 rounded-xl text-xs font-medium border transition ${days.includes(i) ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
-                        >
-                          {l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <div className="text-sm font-medium text-gray-700 mb-2">Окончание серии</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        ["count", "Количество"],
-                        ["until", "До даты"],
-                        ["endless", "Бессрочно"],
-                      ] as const
-                    ).map(([v, l]) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setEndType(v)}
-                        className={`py-2 rounded-xl text-sm font-medium border transition ${endType === v ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"}`}
-                      >
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {endType === "count" && (
-                  <Field label="Количество занятий">
-                    <TextInput type="number" value={count} onChange={(e) => setCount(Number(e.target.value) || 1)} />
-                  </Field>
-                )}
-                {endType === "until" && (
-                  <Field label="Дата окончания">
-                    <TextInput type="date" value={untilDate} onChange={(e) => setUntilDate(e.target.value)} />
-                  </Field>
-                )}
-              </div>
-            )}
-          </div>
+          <RecurrenceFields
+            recurring={recurring}
+            setRecurring={setRecurring}
+            freq={freq}
+            setFreq={setFreq}
+            days={days}
+            toggleDay={toggleDay}
+            endType={endType}
+            setEndType={setEndType}
+            count={count}
+            setCount={setCount}
+            untilDate={untilDate}
+            setUntilDate={setUntilDate}
+          />
         )}
 
         <div className="flex flex-col sm:flex-row gap-2 pt-2">

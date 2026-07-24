@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, Clock, Layers, LogOut, MessageCircle, Paperclip, Send, Wallet } from "lucide-react";
 import { Avatar, Card, EmptyState, PageHeader } from "./components/ui";
+import { AttachmentsField } from "./components/Attachments";
 import { fmtDateRu, TODAY_KEY } from "./lib/utils";
 import {
   fetchStudentHomework,
@@ -11,7 +12,7 @@ import {
   markStudentHomeworkDone,
   sendStudentMessage,
 } from "./lib/studentData";
-import type { ChatMessage, Homework, Lesson, MethodNote, Student } from "./lib/types";
+import type { Attachment, ChatMessage, Homework, Lesson, MethodNote, Student } from "./lib/types";
 
 type Tab = "schedule" | "messages" | "homework";
 
@@ -158,6 +159,7 @@ export default function StudentPortal({ onSignOut }: Props) {
                   <Card className="divide-y divide-[#F0F1F4]">
                     {homework.map((h) => {
                       const note = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
+                      const lesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
                       return (
                         <div key={h.id} className="px-4 sm:px-5 py-4">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -180,11 +182,16 @@ export default function StudentPortal({ onSignOut }: Props) {
                               )}
                             </div>
                           </div>
-                          {(note || (h.attachments && h.attachments.length > 0)) && (
+                          {(note || lesson || (h.attachments && h.attachments.length > 0)) && (
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                               {note && (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB]">
                                   <Layers size={11} /> {note.topic}
+                                </span>
+                              )}
+                              {lesson && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                                  <Calendar size={11} /> урок {fmtDateRu(lesson.date)}
                                 </span>
                               )}
                               {h.attachments?.map((a) => (
@@ -258,16 +265,27 @@ function MessagesTab({
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
+  const [showAttach, setShowAttach] = useState(false);
 
   async function send() {
     const value = text.trim();
-    if (!value || sending) return;
+    if ((!value && pendingFiles.length === 0) || sending) return;
     setSending(true);
-    const optimistic: ChatMessage = { id: `local-${Date.now()}`, from: "student", text: value, at: Date.now() };
+    const optimistic: ChatMessage = {
+      id: `local-${Date.now()}`,
+      from: "student",
+      text: value,
+      at: Date.now(),
+      attachments: pendingFiles.length ? pendingFiles : undefined,
+    };
     setMessages([...messages, optimistic]);
     setText("");
+    const files = pendingFiles;
+    setPendingFiles([]);
+    setShowAttach(false);
     try {
-      await sendStudentMessage(value);
+      await sendStudentMessage(value, files);
     } catch {
       setMessages(messages.filter((m) => m.id !== optimistic.id));
       showToast("Не удалось отправить сообщение");
@@ -281,25 +299,52 @@ function MessagesTab({
       <div className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 420 }}>
         {messages.length === 0 && <div className="text-center text-gray-400 text-sm py-10">Сообщений пока нет</div>}
         {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-sm ${m.from === "student" ? "bg-[#2563EB] text-white ml-auto rounded-br-sm" : "bg-gray-100 rounded-bl-sm"}`}
-          >
-            {m.text}
+          <div key={m.id} className={`max-w-[75%] ${m.from === "student" ? "ml-auto" : ""}`}>
+            {m.text && (
+              <div className={`px-3.5 py-2 rounded-2xl text-sm ${m.from === "student" ? "bg-[#2563EB] text-white rounded-br-sm" : "bg-gray-100 rounded-bl-sm"}`}>
+                {m.text}
+              </div>
+            )}
+            {m.attachments && m.attachments.length > 0 && (
+              <div className={`flex flex-wrap gap-1.5 ${m.text ? "mt-1.5" : ""} ${m.from === "student" ? "justify-end" : ""}`}>
+                {m.attachments.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 max-w-[180px]"
+                  >
+                    <Paperclip size={11} className="shrink-0" /> <span className="truncate">{a.name}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
-      <div className="p-3 border-t border-[#F0F1F4] flex gap-2">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Написать сообщение..."
-          className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30"
-        />
-        <button onClick={send} disabled={sending} className="bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white p-2.5 rounded-xl">
-          <Send size={17} />
-        </button>
+      <div className="p-3 border-t border-[#F0F1F4] space-y-2">
+        {showAttach && <AttachmentsField attachments={pendingFiles} onChange={setPendingFiles} label="Прикрепить к сообщению" />}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAttach((s) => !s)}
+            className={`shrink-0 p-2.5 rounded-xl border transition ${showAttach || pendingFiles.length > 0 ? "bg-blue-50 border-blue-200 text-[#2563EB]" : "bg-white border-[#E7E9EE] text-gray-400 hover:text-gray-600"}`}
+            title="Прикрепить файл"
+          >
+            <Paperclip size={17} />
+          </button>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="Написать сообщение..."
+            className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30"
+          />
+          <button onClick={send} disabled={sending} className="bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white p-2.5 rounded-xl">
+            <Send size={17} />
+          </button>
+        </div>
       </div>
     </Card>
   );

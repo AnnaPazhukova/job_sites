@@ -202,6 +202,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   homework={homework}
                   setHomework={setHomework}
                   students={students}
+                  lessons={lessons}
                   notes={notes}
                   onOpenNote={openNote}
                   showToast={showToast}
@@ -211,7 +212,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
               {view === "notes" && (
                 <NotesView notes={notes} saveNotes={saveNotes} tasks={tasks} showToast={showToast} activeId={activeNoteId} setActiveId={setActiveNoteId} />
               )}
-              {view === "stats" && <StatsView lessons={lessons} students={students} homework={homework} tasks={tasks} notes={notes} />}
+              {view === "stats" && <StatsView lessons={lessons} students={students} homework={homework} tasks={tasks} notes={notes} setView={setView} />}
             </>
           )}
         </main>
