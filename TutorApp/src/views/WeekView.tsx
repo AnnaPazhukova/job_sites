@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
-import { dateKey, TODAY, WEEKDAYS_RU } from "../lib/utils";
-import type { Lesson } from "../lib/types";
+import { dateKey, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
+import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
 export function startOfWeek(d: Date) {
@@ -35,14 +35,26 @@ function addMinutes(time: string, minutes: number) {
 interface Props {
   cursor: Date;
   lessons: Lesson[];
+  students: Student[];
   gcalEvents?: GcalEvent[];
   onDayClick: (date: Date) => void;
   onLessonClick: (lesson: Lesson) => void;
 }
 
-export function WeekView({ cursor, lessons, gcalEvents = [], onDayClick, onLessonClick }: Props) {
+export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick }: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
+
+  function lessonAppearance(l: Lesson) {
+    if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
+    const color = students.find((s) => s.id === l.studentId)?.color;
+    const style = lessonPillStyle(color);
+    if (style) return { className: "hover:opacity-80", style };
+    return {
+      className: l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]",
+      style: undefined,
+    };
+  }
 
   return (
     <div className="grid grid-cols-7 divide-x divide-[#F0F1F4]">
@@ -77,28 +89,29 @@ export function WeekView({ cursor, lessons, gcalEvents = [], onDayClick, onLesso
                   <ExternalLink size={11} className="shrink-0 mt-0.5" />
                 </a>
               ))}
-              {dayLessons.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLessonClick(l);
-                  }}
-                  className={`w-full text-left text-[11px] px-2 py-1.5 rounded-lg font-medium transition
-                    ${
-                      l.status === "cancelled"
-                        ? "bg-gray-100 text-gray-400 line-through"
-                        : l.paymentStatus === "paid"
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                          : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"
-                    }`}
-                >
-                  <div>
-                    {l.time}–{addMinutes(l.time, l.duration)}
-                  </div>
-                  <div className="truncate">{l.title}</div>
-                </button>
-              ))}
+              {dayLessons.map((l) => {
+                const appearance = lessonAppearance(l);
+                const hasCustomColor = !!appearance.style;
+                return (
+                  <button
+                    key={l.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLessonClick(l);
+                    }}
+                    style={appearance.style}
+                    className={`w-full text-left text-[11px] px-2 py-1.5 rounded-lg font-medium transition ${appearance.className}`}
+                  >
+                    <div className="flex items-center gap-1">
+                      {hasCustomColor && l.status !== "cancelled" && (
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
+                      )}
+                      {l.time}–{addMinutes(l.time, l.duration)}
+                    </div>
+                    <div className="truncate">{l.title}</div>
+                  </button>
+                );
+              })}
               {dayLessons.length === 0 && dayGcal.length === 0 && <div className="text-center text-[11px] text-gray-300 pt-4">Пусто</div>}
             </div>
           </div>

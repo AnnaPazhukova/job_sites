@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { setDataAdapter } from "./lib/storage";
@@ -16,14 +16,15 @@ const inviteCode = getInviteCodeFromUrl();
 export default function AuthGate() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [session, setSession] = useState<Session | null>(null);
+  const initialHandled = useRef(false);
 
   async function resolveRole(newSession: Session) {
     if (inviteCode) {
       try {
         await ensureLinked(inviteCode);
       } catch {
-        // Invite invalid/expired — fall through to normal role detection so
-        // the account can still sign in as whatever it already is.
+        // Invite invalid/expired/already used — fall through to normal role
+        // detection so the account can still sign in as whatever it already is.
       }
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -36,24 +37,37 @@ export default function AuthGate() {
 
   useEffect(() => {
     if (!supabase) return;
+    const client = supabase;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        resolveRole(data.session);
-      } else {
+    async function handle(newSession: Session | null) {
+      if (!newSession) {
+        initialHandled.current = true;
+        setSession(null);
         setPhase(inviteCode ? "student-invite" : "signed-out");
+        return;
       }
-    });
+
+      // A session already existed the moment this tab loaded an invite
+      // link — never silently reuse it to claim the invite (that account
+      // might be the tutor's own, or a different student's). Force a clean
+      // sign-out so the invite can only ever be claimed through an explicit
+      // sign-in/sign-up performed on the invite screen itself.
+      if (!initialHandled.current && inviteCode) {
+        initialHandled.current = true;
+        await client.auth.signOut();
+        return;
+      }
+
+      initialHandled.current = true;
+      await resolveRole(newSession);
+    }
+
+    client.auth.getSession().then(({ data }) => handle(data.session));
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (newSession) {
-        resolveRole(newSession);
-      } else {
-        setSession(null);
-        setPhase(inviteCode ? "student-invite" : "signed-out");
-      }
+    } = client.auth.onAuthStateChange((_event, newSession) => {
+      handle(newSession);
     });
 
     return () => subscription.unsubscribe();
@@ -75,9 +89,6 @@ export default function AuthGate() {
         code={inviteCode!}
         onLinked={() => {
           window.history.replaceState(null, "", window.location.pathname);
-          client.auth.getSession().then(({ data }) => {
-            if (data.session) resolveRole(data.session);
-          });
         }}
       />
     );

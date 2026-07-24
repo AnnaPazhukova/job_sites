@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
-import { Card, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
-import { dateKey, MONTHS_RU, TODAY, WEEKDAYS_RU, uid } from "../lib/utils";
+import { Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
+import { buildRecurringDates, dateKey, lessonPillStyle, MONTHS_RU, TODAY, WEEKDAYS_RU, uid, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
 import type { Group, Lesson, Student, WeeklyTemplateSlot } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
@@ -76,15 +76,32 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
     return [...gcalItems, ...lessonItems];
   }
 
+  function lessonAppearance(l: Lesson) {
+    if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
+    const color = students.find((s) => s.id === l.studentId)?.color;
+    const style = lessonPillStyle(color);
+    if (style) return { className: "hover:opacity-80", style };
+    return { className: "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]", style: undefined };
+  }
+
   function openAdd(date: Date) {
     setAddDate(date);
     setShowAdd(true);
   }
 
-  function addLesson(data: Partial<Lesson>) {
-    setLessons([...lessons, { id: uid(), status: "scheduled", paymentStatus: "pending", ...data } as Lesson]);
+  function addLesson(data: Partial<Lesson> & { occurrences?: string[] }) {
+    const { occurrences, ...base } = data;
+    const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
+    const created: Lesson[] = dates.map((date) => ({
+      ...(base as Omit<Lesson, "id" | "date" | "status" | "paymentStatus">),
+      id: uid(),
+      date,
+      status: "scheduled",
+      paymentStatus: "pending",
+    }));
+    setLessons([...lessons, ...created]);
     setShowAdd(false);
-    showToast("Занятие добавлено в расписание");
+    showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено в расписание");
   }
 
   function saveLessonEdit(data: Partial<Lesson>) {
@@ -257,8 +274,8 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
                             e.stopPropagation();
                             setEditLesson(item.l);
                           }}
-                          className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition
-                            ${item.l.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]"}`}
+                          style={lessonAppearance(item.l).style}
+                          className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition ${lessonAppearance(item.l).className}`}
                         >
                           {item.l.time} · {item.l.title}
                         </button>
@@ -273,7 +290,7 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <WeekView cursor={cursor} lessons={lessons} gcalEvents={gcal.events} onDayClick={openAdd} onLessonClick={setEditLesson} />
+          <WeekView cursor={cursor} lessons={lessons} students={students} gcalEvents={gcal.events} onDayClick={openAdd} onLessonClick={setEditLesson} />
         </Card>
       )}
 
@@ -318,7 +335,7 @@ function AddLessonModal({
   students: Student[];
   groups: Group[];
   onClose: () => void;
-  onSave: (data: Partial<Lesson>) => void;
+  onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
 }) {
   const options = [
     ...students.map((s) => ({ id: s.id, name: s.name, type: "student" as const, rate: s.rate || 0, duration: s.duration || 60 })),
@@ -329,6 +346,16 @@ function AddLessonModal({
   const [duration, setDuration] = useState(options[0]?.duration || 60);
   const [price, setPrice] = useState(options[0]?.rate || 0);
   const [dateStr, setDateStr] = useState(dateKey(date || new Date()));
+  const [recurring, setRecurring] = useState(false);
+  const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
+  const [days, setDays] = useState<number[]>([]);
+  const [endType, setEndType] = useState<RecurrenceEnd>("count");
+  const [count, setCount] = useState(8);
+  const [untilDate, setUntilDate] = useState("");
+
+  function toggleDay(d: number) {
+    setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
+  }
 
   function selectWho(id: string) {
     setWho(id);
@@ -351,11 +378,12 @@ function AddLessonModal({
       time,
       duration: Number(duration),
       price: Number(price),
+      occurrences: recurring ? buildRecurringDates(dateStr, freq, days, endType, count, untilDate) : undefined,
     });
   }
 
   return (
-    <Modal title="Новое занятие" onClose={onClose}>
+    <Modal title="Новое занятие" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Дата">
           <TextInput icon={CalendarIcon} type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
@@ -390,6 +418,20 @@ function AddLessonModal({
         <Field label="Стоимость, ₽">
           <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
         </Field>
+        <RecurrenceFields
+          recurring={recurring}
+          setRecurring={setRecurring}
+          freq={freq}
+          setFreq={setFreq}
+          days={days}
+          toggleDay={toggleDay}
+          endType={endType}
+          setEndType={setEndType}
+          count={count}
+          setCount={setCount}
+          untilDate={untilDate}
+          setUntilDate={setUntilDate}
+        />
         <PrimaryButton type="submit" full disabled={options.length === 0}>
           Добавить в расписание
         </PrimaryButton>

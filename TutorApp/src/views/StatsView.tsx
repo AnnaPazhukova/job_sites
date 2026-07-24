@@ -1,7 +1,7 @@
-import { AlertCircle, BookOpen, Calendar as CalendarIcon, CheckCircle2, Clock, Layers, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { AlertCircle, BookOpen, Calendar as CalendarIcon, ChevronRight, CheckCircle2, Clock, Layers, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { Card, PageHeader } from "../components/ui";
 import { fmtMoney, sumPrice, TODAY, TODAY_KEY, dateKey } from "../lib/utils";
-import type { Homework, Lesson, MethodNote, Student, Task } from "../lib/types";
+import type { Homework, Lesson, MethodNote, Student, Task, ViewId } from "../lib/types";
 
 interface Props {
   lessons: Lesson[];
@@ -9,9 +9,10 @@ interface Props {
   homework: Homework[];
   tasks: Task[];
   notes: MethodNote[];
+  setView: (v: ViewId) => void;
 }
 
-export function StatsView({ lessons, students, homework, tasks, notes }: Props) {
+export function StatsView({ lessons, students, homework, tasks, notes, setView }: Props) {
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(TODAY);
     d.setDate(d.getDate() - 13 + i);
@@ -51,10 +52,10 @@ export function StatsView({ lessons, students, homework, tasks, notes }: Props) 
       <div className="text-sm text-gray-500 mb-5">Анализ вашей деятельности на сегодняшний день</div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard color="emerald" icon={CheckCircle2} label="Оплаченные занятия" sub="Получено по факту" value={fmtMoney(paidPast)} />
-        <StatCard color="teal" icon={Wallet} label="Оплачено вперёд" sub="Авансовые платежи" value={fmtMoney(paidAdvance)} />
-        <StatCard color="rose" icon={AlertCircle} label="Ожидает оплаты" sub="Дебиторская задолженность" value={fmtMoney(debt)} />
-        <StatCard color="blue" icon={TrendingUp} label="До конца месяца" sub="Прогноз дохода" value={fmtMoney(monthForecast)} />
+        <StatCard color="emerald" icon={CheckCircle2} label="Оплаченные занятия" sub="Получено по факту" value={fmtMoney(paidPast)} onClick={() => setView("schedule")} />
+        <StatCard color="teal" icon={Wallet} label="Оплачено вперёд" sub="Авансовые платежи" value={fmtMoney(paidAdvance)} onClick={() => setView("schedule")} />
+        <StatCard color="rose" icon={AlertCircle} label="Ожидает оплаты" sub="Дебиторская задолженность" value={fmtMoney(debt)} onClick={() => setView("schedule")} />
+        <StatCard color="blue" icon={TrendingUp} label="До конца месяца" sub="Прогноз дохода" value={fmtMoney(monthForecast)} onClick={() => setView("schedule")} />
       </div>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -82,12 +83,15 @@ export function StatsView({ lessons, students, homework, tasks, notes }: Props) 
                 </div>
                 <div className="text-2xl font-extrabold">{tasks.length}</div>
               </div>
-              <div className="bg-[#F7F8FA] rounded-xl px-3.5 py-3">
+              <button
+                onClick={() => setView("notes")}
+                className="bg-[#F7F8FA] rounded-xl px-3.5 py-3 text-left hover:bg-[#F0F1F4] transition"
+              >
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
                   <Layers size={15} className="text-[#2F5B4E]" /> Тем методики
                 </div>
                 <div className="text-2xl font-extrabold">{notes.length}</div>
-              </div>
+              </button>
             </div>
           </Card>
         </div>
@@ -109,9 +113,10 @@ export function StatsView({ lessons, students, homework, tasks, notes }: Props) 
               <span className="font-semibold text-sm">{scheduledHours.toFixed(1)} ч</span>
             </div>
           </Card>
-          <Card className="p-5">
+          <Card onClick={() => setView("homework")} className="p-5 cursor-pointer hover:shadow-md hover:border-gray-300 transition">
             <div className="font-semibold flex items-center gap-2 mb-3">
               <BookOpen size={17} className="text-red-500" /> Домашние задания
+              <ChevronRight size={15} className="text-gray-300 ml-auto" />
             </div>
             <div className="text-xs text-gray-500 mb-1">Несделанных работ</div>
             <div className="text-3xl font-extrabold text-red-600 mb-3">{pendingHomework}</div>
@@ -121,9 +126,10 @@ export function StatsView({ lessons, students, homework, tasks, notes }: Props) 
               <div className="text-xs bg-emerald-50 text-emerald-600 px-3 py-2 rounded-xl">Все работы проверены</div>
             )}
           </Card>
-          <Card className="p-5">
+          <Card onClick={() => setView("schedule")} className="p-5 cursor-pointer hover:shadow-md hover:border-gray-300 transition">
             <div className="font-semibold flex items-center gap-2 mb-3">
               <CalendarIcon size={17} className="text-amber-500" /> Прошедшие неоплаченные
+              <ChevronRight size={15} className="text-gray-300 ml-auto" />
             </div>
             <div className="text-xs text-gray-500 mb-3">Занятия в прошлом без отметки об оплате. Всего: {missed}</div>
             {missed === 0 ? (
@@ -148,10 +154,27 @@ const STAT_COLORS: Record<string, string> = {
   blue: "bg-blue-50 text-blue-600",
 };
 
-function StatCard({ color, icon: Icon, label, sub, value }: { color: string; icon: LucideIcon; label: string; sub: string; value: string }) {
+function StatCard({
+  color,
+  icon: Icon,
+  label,
+  sub,
+  value,
+  onClick,
+}: {
+  color: string;
+  icon: LucideIcon;
+  label: string;
+  sub: string;
+  value: string;
+  onClick?: () => void;
+}) {
   const [bg, text] = STAT_COLORS[color].split(" ");
   return (
-    <Card className={`p-4 sm:p-5 ${bg} border-0`}>
+    <Card
+      onClick={onClick}
+      className={`p-4 sm:p-5 ${bg} border-0 ${onClick ? "cursor-pointer hover:shadow-md hover:brightness-[0.98] transition text-left" : ""}`}
+    >
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
           <Icon size={16} className={text} />

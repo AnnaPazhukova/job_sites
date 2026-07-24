@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { BookOpen, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
+import { BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, TODAY_KEY, uid } from "../lib/utils";
-import type { Attachment, Homework, HomeworkStatus, MethodNote, Student } from "../lib/types";
+import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
   homework: Homework[];
   setHomework: (h: Homework[]) => void;
   students: Student[];
+  lessons: Lesson[];
   notes: MethodNote[];
   onOpenNote: (id: string) => void;
   showToast: (t: string) => void;
@@ -26,7 +27,7 @@ function effectiveStatus(h: Homework) {
   return "pending";
 }
 
-export function HomeworkView({ homework, setHomework, students, notes, onOpenNote, showToast }: Props) {
+export function HomeworkView({ homework, setHomework, students, lessons, notes, onOpenNote, showToast }: Props) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -42,7 +43,15 @@ export function HomeworkView({ homework, setHomework, students, notes, onOpenNot
     showToast("Работа отмечена как проверенная");
   }
 
-  function addHomework(data: { studentId: string; studentName: string; title: string; due: string | null; noteId?: string; attachments: Attachment[] }) {
+  function addHomework(data: {
+    studentId: string;
+    studentName: string;
+    title: string;
+    due: string | null;
+    noteId?: string;
+    lessonId?: string;
+    attachments: Attachment[];
+  }) {
     setHomework([{ id: uid(), status: "pending", ...data }, ...homework]);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");
@@ -95,6 +104,7 @@ export function HomeworkView({ homework, setHomework, students, notes, onOpenNot
             const st = students.find((s) => s.id === h.studentId);
             const meta = STATUS_META[effectiveStatus(h)];
             const linkedNote = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
+            const linkedLesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
             return (
               <div key={h.id} className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap">
                 {st ? <Avatar id={st.id} name={st.name} size={38} /> : <div className="w-[38px]" />}
@@ -103,7 +113,7 @@ export function HomeworkView({ homework, setHomework, students, notes, onOpenNot
                   <div className="text-xs text-gray-500 truncate">
                     {h.studentName} · {h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}
                   </div>
-                  {(linkedNote || (h.attachments && h.attachments.length > 0)) && (
+                  {(linkedNote || linkedLesson || (h.attachments && h.attachments.length > 0)) && (
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {linkedNote && (
                         <button
@@ -112,6 +122,11 @@ export function HomeworkView({ homework, setHomework, students, notes, onOpenNot
                         >
                           <Layers size={11} /> {linkedNote.topic}
                         </button>
+                      )}
+                      {linkedLesson && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                          <Calendar size={11} /> урок {fmtDateRu(linkedLesson.date)}
+                        </span>
                       )}
                       {h.attachments && h.attachments.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
@@ -134,40 +149,70 @@ export function HomeworkView({ homework, setHomework, students, notes, onOpenNot
         </Card>
       )}
 
-      {showAdd && <AddHomeworkModal students={students} notes={notes} onClose={() => setShowAdd(false)} onSave={addHomework} />}
+      {showAdd && <AddHomeworkModal students={students} lessons={lessons} notes={notes} onClose={() => setShowAdd(false)} onSave={addHomework} />}
     </div>
   );
 }
 
 function AddHomeworkModal({
   students,
+  lessons,
   notes,
   onClose,
   onSave,
 }: {
   students: Student[];
+  lessons: Lesson[];
   notes: MethodNote[];
   onClose: () => void;
-  onSave: (data: { studentId: string; studentName: string; title: string; due: string | null; noteId?: string; attachments: Attachment[] }) => void;
+  onSave: (data: {
+    studentId: string;
+    studentName: string;
+    title: string;
+    due: string | null;
+    noteId?: string;
+    lessonId?: string;
+    attachments: Attachment[];
+  }) => void;
 }) {
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
   const [noteId, setNoteId] = useState("");
+  const [lessonId, setLessonId] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  const studentLessons = lessons
+    .filter((l) => l.studentId === studentId && l.status !== "cancelled")
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const st = students.find((s) => s.id === studentId);
     if (!title.trim() || !st) return;
-    onSave({ studentId, studentName: st.name, title: title.trim(), due: due || null, noteId: noteId || undefined, attachments });
+    onSave({
+      studentId,
+      studentName: st.name,
+      title: title.trim(),
+      due: due || null,
+      noteId: noteId || undefined,
+      lessonId: lessonId || undefined,
+      attachments,
+    });
   }
 
   return (
     <Modal title="Новое домашнее задание" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Ученик">
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
+          <select
+            value={studentId}
+            onChange={(e) => {
+              setStudentId(e.target.value);
+              setLessonId("");
+            }}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
+          >
             {students.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -180,6 +225,17 @@ function AddHomeworkModal({
         </Field>
         <Field label="Срок сдачи">
           <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </Field>
+        <Field label="Урок из расписания (необязательно)">
+          <select value={lessonId} onChange={(e) => setLessonId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
+            <option value="">Без урока</option>
+            {studentLessons.map((l) => (
+              <option key={l.id} value={l.id}>
+                {fmtDateRu(l.date)}, {l.time}
+              </option>
+            ))}
+          </select>
+          {studentLessons.length === 0 && <div className="text-xs text-gray-400 mt-1">У этого ученика пока нет занятий в расписании</div>}
         </Field>
         <Field label="Урок из методики (необязательно)">
           <select value={noteId} onChange={(e) => setNoteId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
