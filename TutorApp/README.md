@@ -41,23 +41,19 @@ npm run build    # сборка (tsc -b && vite build)
 2. В SQL Editor выполните `supabase/schema.sql` (создаёт таблицу `app_kv`,
    политики RLS и всё для личного кабинета ученика — см. ниже).
 3. В Project Settings → API скопируйте **Project URL** и **anon public key**.
-4. В Authentication → URL Configuration укажите **Site URL** — адрес вашего
-   опубликованного сайта (например, `https://<username>.github.io/job_sites/`).
-   Это нужно, чтобы ссылка для входа (см. ниже) вела обратно на сайт, а не
-   на `localhost`.
-5. Для локальной разработки: скопируйте `.env.example` в `.env.local` и
+4. Для локальной разработки: скопируйте `.env.example` в `.env.local` и
    вставьте оба значения.
-6. Для деплоя: добавьте оба значения как секреты репозитория GitHub
+5. Для деплоя: добавьте оба значения как секреты репозитория GitHub
    (Settings → Secrets and variables → Actions) с именами
    `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — workflow подставит их при
    сборке.
 
-### Вход репетитора — по ссылке (magic link)
+### Вход репетитора — email и пароль
 
-Пароля нет: на экране входа репетитор вводит email, Supabase присылает
-письмо со ссылкой — переход по ней сразу открывает CRM (аккаунт создаётся
-автоматически при первом входе). Реализовано через
-`supabase.auth.signInWithOtp` в `src/LoginScreen.tsx`.
+Обычный вход: email + пароль (экран входа/регистрации в
+`src/LoginScreen.tsx`, `supabase.auth.signInWithPassword`/`signUp`). Если
+в настройках Supabase Auth включено подтверждение почты — после
+регистрации нужно подтвердить её по ссылке в письме, прежде чем входить.
 
 ### Supabase Storage (файлы: картинки, PDF, Word)
 
