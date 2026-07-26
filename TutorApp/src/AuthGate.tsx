@@ -1,108 +1,79 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { setDataAdapter } from "./lib/storage";
 import { SupabaseAdapter } from "./lib/supabaseStorage";
-import { getInviteCodeFromUrl, getStudentLink, ensureLinked } from "./lib/studentAuth";
+import { clearStoredPortalCode, getInviteCodeFromUrl, getStoredPortalCode, storePortalCode } from "./lib/studentAuth";
 import { LoginScreen } from "./LoginScreen";
-import { StudentSignupScreen } from "./StudentSignupScreen";
 import StudentPortal from "./StudentPortal";
 import App from "./App";
 
-type Phase = "loading" | "signed-out" | "student-invite" | "tutor" | "student";
+type Phase = "loading" | "signed-out" | "tutor";
 
-const inviteCode = getInviteCodeFromUrl();
+// A student's "login" is just having the access-link code — from the URL
+// on first visit (then remembered in localStorage), or from localStorage on
+// every visit after. This never touches Supabase Auth, so it's resolved
+// entirely separately from the tutor's session below.
+function resolvePortalCode(): string | null {
+  const urlCode = getInviteCodeFromUrl();
+  if (urlCode) {
+    storePortalCode(urlCode);
+    window.history.replaceState(null, "", window.location.pathname);
+    return urlCode;
+  }
+  return getStoredPortalCode();
+}
 
 export default function AuthGate() {
+  const [portalCode, setPortalCode] = useState<string | null>(() => (supabase ? resolvePortalCode() : null));
   const [phase, setPhase] = useState<Phase>("loading");
   const [session, setSession] = useState<Session | null>(null);
-  const initialHandled = useRef(false);
-
-  async function resolveRole(newSession: Session) {
-    if (inviteCode) {
-      try {
-        await ensureLinked(inviteCode);
-      } catch {
-        // Invite invalid/expired/already used — fall through to normal role
-        // detection so the account can still sign in as whatever it already is.
-      }
-      window.history.replaceState(null, "", window.location.pathname);
-    }
-
-    setDataAdapter(new SupabaseAdapter());
-    setSession(newSession);
-    const link = await getStudentLink();
-    setPhase(link ? "student" : "tutor");
-  }
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || portalCode) return;
     const client = supabase;
 
-    async function handle(newSession: Session | null) {
-      if (!newSession) {
-        initialHandled.current = true;
-        setSession(null);
-        setPhase(inviteCode ? "student-invite" : "signed-out");
-        return;
-      }
-
-      // A session already existed the moment this tab loaded an invite
-      // link — never silently reuse it to claim the invite (that account
-      // might be the tutor's own, or a different student's). Force a clean
-      // sign-out so the invite can only ever be claimed through an explicit
-      // sign-in/sign-up performed on the invite screen itself.
-      if (!initialHandled.current && inviteCode) {
-        initialHandled.current = true;
-        await client.auth.signOut();
-        return;
-      }
-
-      initialHandled.current = true;
-      await resolveRole(newSession);
-    }
-
-    client.auth.getSession().then(({ data }) => handle(data.session));
+    client.auth.getSession().then(({ data }) => {
+      setDataAdapter(new SupabaseAdapter());
+      setSession(data.session);
+      setPhase(data.session ? "tutor" : "signed-out");
+    });
 
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, newSession) => {
-      handle(newSession);
+      setDataAdapter(new SupabaseAdapter());
+      setSession(newSession);
+      setPhase(newSession ? "tutor" : "signed-out");
     });
 
     return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [portalCode]);
 
   if (!supabase) {
     return <App />;
   }
-  const client = supabase;
 
-  if (phase === "loading") {
-    return <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#F7F8FA]">Загрузка…</div>;
-  }
-
-  if (phase === "student-invite") {
+  if (portalCode) {
     return (
-      <StudentSignupScreen
-        code={inviteCode!}
-        onLinked={() => {
-          window.history.replaceState(null, "", window.location.pathname);
+      <StudentPortal
+        code={portalCode}
+        onExit={() => {
+          clearStoredPortalCode();
+          setPortalCode(null);
         }}
       />
     );
+  }
+
+  if (phase === "loading") {
+    return <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#F7F8FA]">Загрузка…</div>;
   }
 
   if (phase === "signed-out") {
     return <LoginScreen />;
   }
 
-  const signOut = () => client.auth.signOut();
-
-  if (phase === "student") {
-    return <StudentPortal onSignOut={signOut} />;
-  }
-
-  return <App userEmail={session?.user.email} onSignOut={signOut} />;
+  const client = supabase;
+  return <App userEmail={session?.user.email} onSignOut={() => client.auth.signOut()} />;
 }

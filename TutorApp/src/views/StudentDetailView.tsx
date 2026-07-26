@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cake,
   Calendar as CalendarIcon,
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, RecurrenceFields, Select, TextInput } from "../components/ui";
 import { buildRecurringDates, fmtDateRu, GRADES, SUBSCRIPTION_SIZES, TODAY_KEY, uid, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
-import { createInvite, inviteLink, studentPortalEnabled } from "../lib/studentAuth";
+import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import type { Homework, Lesson, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -45,6 +45,12 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPackagePicker, setShowPackagePicker] = useState(false);
+
+  useEffect(() => {
+    if (!studentPortalEnabled || !selectedStudentId) return;
+    setInvite(null);
+    getExistingAccessLink(selectedStudentId).then(setInvite);
+  }, [selectedStudentId]);
 
   if (!student) {
     return (
@@ -89,6 +95,19 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setInviteError("Не удалось скопировать ссылку");
+    }
+  }
+
+  async function handleRevoke() {
+    if (!invite) return;
+    setInviteBusy(true);
+    try {
+      await revokeAccessLink(invite);
+      setInvite(null);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Не удалось отключить доступ");
+    } finally {
+      setInviteBusy(false);
     }
   }
 
@@ -161,7 +180,7 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div className="font-bold text-xl">Основная информация</div>
           <div className="flex items-center gap-2 flex-wrap">
-            {studentPortalEnabled && (
+            {studentPortalEnabled && !invite && (
               <GhostButton icon={KeyRound} onClick={handleInvite} disabled={inviteBusy}>
                 {inviteBusy ? "Создаём…" : "Пригласить в кабинет"}
               </GhostButton>
@@ -179,15 +198,22 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
             ) : (
               <>
                 <div className="text-xs text-gray-500 mb-1.5">
-                  Отправьте эту ссылку ученику — по ней он зарегистрирует личный кабинет и увидит своё расписание, переписку и домашние задания.
+                  Отправьте эту ссылку ученику — перейдя по ней, он сразу попадёт в свой личный кабинет (расписание, переписка, домашние задания), без регистрации и пароля. Ссылка постоянная — работает, пока вы её не отключите.
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <TextInput readOnly value={inviteLink(invite!)} className="text-xs" />
                   <button
                     onClick={copyInviteLink}
                     className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 transition"
                   >
                     <Copy size={14} /> {copied ? "Скопировано" : "Копировать"}
+                  </button>
+                  <button
+                    onClick={handleRevoke}
+                    disabled={inviteBusy}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-xl border border-red-200 text-red-600 bg-white hover:bg-red-50 transition disabled:opacity-50"
+                  >
+                    <X size={14} /> Отключить доступ
                   </button>
                 </div>
               </>

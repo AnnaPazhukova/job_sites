@@ -1,31 +1,31 @@
 import { supabase } from "./supabaseClient";
 import type { Attachment, ChatMessage, Homework, Lesson, MethodNote, Student } from "./types";
 
-async function getData<T>(key: string): Promise<T> {
+async function getData<T>(code: string, key: string): Promise<T> {
   if (!supabase) return [] as unknown as T;
-  const { data, error } = await supabase.rpc("student_get_data", { p_key: key });
+  const { data, error } = await supabase.rpc("portal_get_data", { p_code: code, p_key: key });
   if (error) throw error;
   return (data ?? []) as T;
 }
 
-export const fetchStudentLessons = () => getData<Lesson[]>("lessons");
-export const fetchStudentHomework = () => getData<Homework[]>("homework");
-export const fetchStudentMessages = () => getData<ChatMessage[]>("messages");
-export const fetchStudentLinkedNotes = () => getData<MethodNote[]>("linked-notes");
+export const fetchStudentLessons = (code: string) => getData<Lesson[]>(code, "lessons");
+export const fetchStudentHomework = (code: string) => getData<Homework[]>(code, "homework");
+export const fetchStudentMessages = (code: string) => getData<ChatMessage[]>(code, "messages");
+export const fetchStudentLinkedNotes = (code: string) => getData<MethodNote[]>(code, "linked-notes");
 
-export async function fetchStudentProfile(): Promise<Student | null> {
-  const list = await getData<Student[]>("students");
+export async function fetchStudentProfile(code: string): Promise<Student | null> {
+  const list = await getData<Student[]>(code, "students");
   return list[0] || null;
 }
 
-export async function sendStudentMessage(text: string, attachments: Attachment[] = []): Promise<void> {
+export async function sendStudentMessage(code: string, text: string, attachments: Attachment[] = []): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.rpc("student_send_message", { p_text: text, p_attachments: attachments });
+  const { error } = await supabase.rpc("portal_send_message", { p_code: code, p_text: text, p_attachments: attachments });
   if (error) throw error;
 }
 
-export async function markStudentHomeworkDone(id: string): Promise<void> {
+export async function markStudentHomeworkDone(code: string, id: string): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.rpc("student_mark_homework_done", { p_homework_id: id });
+  const { error } = await supabase.rpc("portal_mark_homework_done", { p_code: code, p_homework_id: id });
   if (error) throw error;
 }

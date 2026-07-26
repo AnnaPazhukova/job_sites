@@ -17,10 +17,11 @@ import type { Attachment, ChatMessage, Homework, Lesson, MethodNote, Student } f
 type Tab = "schedule" | "messages" | "homework";
 
 interface Props {
-  onSignOut: () => void;
+  code: string;
+  onExit: () => void;
 }
 
-export default function StudentPortal({ onSignOut }: Props) {
+export default function StudentPortal({ code, onExit }: Props) {
   const [tab, setTab] = useState<Tab>("schedule");
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Student | null>(null);
@@ -29,6 +30,7 @@ export default function StudentPortal({ onSignOut }: Props) {
   const [notes, setNotes] = useState<MethodNote[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -37,21 +39,27 @@ export default function StudentPortal({ onSignOut }: Props) {
 
   useEffect(() => {
     (async () => {
-      const [p, l, h, n, m] = await Promise.all([
-        fetchStudentProfile(),
-        fetchStudentLessons(),
-        fetchStudentHomework(),
-        fetchStudentLinkedNotes(),
-        fetchStudentMessages(),
-      ]);
-      setProfile(p);
-      setLessons(l);
-      setHomework(h);
-      setNotes(n);
-      setMessages(m);
-      setLoading(false);
+      try {
+        const [p, l, h, n, m] = await Promise.all([
+          fetchStudentProfile(code),
+          fetchStudentLessons(code),
+          fetchStudentHomework(code),
+          fetchStudentLinkedNotes(code),
+          fetchStudentMessages(code),
+        ]);
+        setProfile(p);
+        setLessons(l);
+        setHomework(h);
+        setNotes(n);
+        setMessages(m);
+      } catch {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const upcoming = lessons
     .filter((l) => l.status !== "cancelled" && l.date >= TODAY_KEY)
@@ -63,7 +71,7 @@ export default function StudentPortal({ onSignOut }: Props) {
   async function markDone(id: string) {
     setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "done" } : h)));
     try {
-      await markStudentHomeworkDone(id);
+      await markStudentHomeworkDone(code, id);
       showToast("Отмечено как сделано");
     } catch {
       showToast("Не удалось сохранить, попробуйте ещё раз");
@@ -91,7 +99,7 @@ export default function StudentPortal({ onSignOut }: Props) {
                 <span className="text-sm font-medium">{profile.name}</span>
               </div>
             )}
-            <button onClick={onSignOut} className="p-2.5 rounded-full hover:bg-red-50 text-[#DC2626] transition" aria-label="Выход">
+            <button onClick={onExit} className="p-2.5 rounded-full hover:bg-red-50 text-[#DC2626] transition" aria-label="Выход">
               <LogOut size={19} />
             </button>
           </div>
@@ -99,7 +107,12 @@ export default function StudentPortal({ onSignOut }: Props) {
       </header>
 
       <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-6">
-        {loading ? (
+        {notFound ? (
+          <div className="py-24 text-center text-gray-500">
+            <div className="font-semibold text-lg mb-1">Ссылка недействительна</div>
+            <div className="text-sm">Возможно, репетитор отключил доступ по этой ссылке. Попросите новую.</div>
+          </div>
+        ) : loading ? (
           <div className="py-24 text-center text-gray-400">Загрузка данных...</div>
         ) : (
           <>
@@ -149,7 +162,7 @@ export default function StudentPortal({ onSignOut }: Props) {
               </div>
             )}
 
-            {tab === "messages" && <MessagesTab messages={messages} setMessages={setMessages} showToast={showToast} />}
+            {tab === "messages" && <MessagesTab code={code} messages={messages} setMessages={setMessages} showToast={showToast} />}
 
             {tab === "homework" && (
               <div>
@@ -255,10 +268,12 @@ function LessonRow({ lesson }: { lesson: Lesson }) {
 }
 
 function MessagesTab({
+  code,
   messages,
   setMessages,
   showToast,
 }: {
+  code: string;
   messages: ChatMessage[];
   setMessages: (m: ChatMessage[]) => void;
   showToast: (t: string) => void;
@@ -285,7 +300,7 @@ function MessagesTab({
     setPendingFiles([]);
     setShowAttach(false);
     try {
-      await sendStudentMessage(value, files);
+      await sendStudentMessage(code, value, files);
     } catch {
       setMessages(messages.filter((m) => m.id !== optimistic.id));
       showToast("Не удалось отправить сообщение");

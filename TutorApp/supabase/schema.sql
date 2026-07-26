@@ -40,84 +40,46 @@ create policy "upload own attachments" on storage.objects
 create policy "delete own attachments" on storage.objects
   for delete using (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
 
--- Student portal: a student gets their own Supabase Auth account, linked to
--- one student record inside the tutor's data via an invite code. The tutor's
--- app_kv rows stay owned/RLS-scoped by the tutor as before; students never
--- get direct access to app_kv. Instead, SECURITY DEFINER functions below
--- read the tutor's row internally and hand back only the slice that matches
--- the student's own id, so a logged-in student can never see another
--- student's lessons, homework, or messages.
+-- Student portal: NOT backed by a Supabase Auth account. A student's
+-- "login" is simply possessing an unguessable access-link code (created by
+-- the tutor, shown as a URL) — visiting the link grants portal access
+-- directly, no signup/sign-in step. Security rests entirely on the code
+-- being long and random (see secureToken() on the client) and on these
+-- SECURITY DEFINER functions only ever returning the slice of the tutor's
+-- data matching that one code's student_id — the tutor's app_kv rows stay
+-- owned/RLS-scoped to the tutor as before, and are never exposed wholesale.
+--
+-- Superseded objects from the old auth-account-based design, dropped
+-- first so re-running this script on a database that had it cleans up
+-- fully instead of leaving orphaned tables/functions:
+drop function if exists public.claim_student_invite(text);
+drop function if exists public.student_get_data(text);
+drop function if exists public.student_send_message(text);
+drop function if exists public.student_send_message(text, jsonb);
+drop function if exists public.student_mark_homework_done(text);
+drop table if exists public.student_accounts;
 
 create table if not exists public.student_invites (
   code text primary key,
   tutor_id uuid not null references auth.users (id) on delete cascade,
   student_id text not null,
-  used boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.student_invites drop column if exists used;
 
 alter table public.student_invites enable row level security;
 
+drop policy if exists "tutor manages own invites" on public.student_invites;
 create policy "tutor manages own invites" on public.student_invites
   for all using (auth.uid() = tutor_id) with check (auth.uid() = tutor_id);
 
-create table if not exists public.student_accounts (
-  user_id uuid primary key references auth.users (id) on delete cascade,
-  tutor_id uuid not null references auth.users (id) on delete cascade,
-  student_id text not null,
-  created_at timestamptz not null default now()
-);
-
-alter table public.student_accounts enable row level security;
-
-create policy "student reads own link" on public.student_accounts
-  for select using (auth.uid() = user_id);
-
-create policy "tutor reads own students' links" on public.student_accounts
-  for select using (auth.uid() = tutor_id);
-
--- Called by a student right after supabase.auth.signUp() using the code from
--- their invite link. Links their new auth account to the student record and
--- marks the invite used so it can't be replayed.
-create or replace function public.claim_student_invite(p_code text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_tutor uuid;
-  v_student text;
-  v_used boolean;
-begin
-  select tutor_id, student_id, used into v_tutor, v_student, v_used
-  from public.student_invites where code = p_code;
-
-  if v_tutor is null then
-    raise exception 'Неверный код приглашения';
-  end if;
-  if v_used then
-    raise exception 'Код приглашения уже использован';
-  end if;
-  if auth.uid() = v_tutor then
-    raise exception 'Нельзя принять приглашение под аккаунтом репетитора, который его создал';
-  end if;
-
-  insert into public.student_accounts (user_id, tutor_id, student_id)
-  values (auth.uid(), v_tutor, v_student)
-  on conflict (user_id) do update set tutor_id = excluded.tutor_id, student_id = excluded.student_id;
-
-  update public.student_invites set used = true where code = p_code;
-end;
-$$;
-
-grant execute on function public.claim_student_invite(text) to authenticated;
-
--- Returns just the caller's own slice of a given data key ('students',
--- 'lessons', 'homework', or 'messages'), read from their linked tutor's
--- app_kv row. Anything not matching the student's id is filtered out inside
--- this function, before it ever leaves the database.
-create or replace function public.student_get_data(p_key text)
+-- Returns just the link code's own slice of a given data key ('students',
+-- 'lessons', 'homework', 'messages', or 'linked-notes'), read from the
+-- linked tutor's app_kv row. Anything not matching the student's id is
+-- filtered out inside this function, before it ever leaves the database.
+-- Callable by anon (no session) since the code itself is the credential.
+create or replace function public.portal_get_data(p_code text, p_key text)
 returns jsonb
 language plpgsql
 security definer
@@ -130,10 +92,10 @@ declare
   v_filtered jsonb;
 begin
   select tutor_id, student_id into v_tutor, v_student
-  from public.student_accounts where user_id = auth.uid();
+  from public.student_invites where code = p_code;
 
   if v_tutor is null then
-    raise exception 'Аккаунт не привязан к ученику';
+    raise exception 'Ссылка недействительна';
   end if;
 
   -- Notes referenced by the student's own homework: read both slices and
@@ -182,18 +144,12 @@ begin
 end;
 $$;
 
-grant execute on function public.student_get_data(text) to authenticated;
+grant execute on function public.portal_get_data(text, text) to anon, authenticated;
 
 -- Appends a "from: student" chat message (optionally with file
 -- attachments already uploaded to Storage) into the tutor's messages blob,
--- under the caller's own student id only.
--- Dropped first: adding a parameter changes the function's signature, so
--- `create or replace` would otherwise leave the old single-argument version
--- around as an ambiguous overload on databases that ran an earlier version
--- of this script.
-drop function if exists public.student_send_message(text);
-
-create or replace function public.student_send_message(p_text text, p_attachments jsonb default '[]'::jsonb)
+-- under the link code's own student id only.
+create or replace function public.portal_send_message(p_code text, p_text text, p_attachments jsonb default '[]'::jsonb)
 returns void
 language plpgsql
 security definer
@@ -207,10 +163,10 @@ declare
   v_message jsonb;
 begin
   select tutor_id, student_id into v_tutor, v_student
-  from public.student_accounts where user_id = auth.uid();
+  from public.student_invites where code = p_code;
 
   if v_tutor is null then
-    raise exception 'Аккаунт не привязан к ученику';
+    raise exception 'Ссылка недействительна';
   end if;
   if coalesce(trim(p_text), '') = '' and jsonb_array_length(coalesce(p_attachments, '[]'::jsonb)) = 0 then
     raise exception 'Пустое сообщение';
@@ -238,10 +194,10 @@ begin
 end;
 $$;
 
-grant execute on function public.student_send_message(text, jsonb) to authenticated;
+grant execute on function public.portal_send_message(text, text, jsonb) to anon, authenticated;
 
--- Marks one of the caller's own homework items as done.
-create or replace function public.student_mark_homework_done(p_homework_id text)
+-- Marks one of the link code's own homework items as done.
+create or replace function public.portal_mark_homework_done(p_code text, p_homework_id text)
 returns void
 language plpgsql
 security definer
@@ -254,10 +210,10 @@ declare
   v_next jsonb;
 begin
   select tutor_id, student_id into v_tutor, v_student
-  from public.student_accounts where user_id = auth.uid();
+  from public.student_invites where code = p_code;
 
   if v_tutor is null then
-    raise exception 'Аккаунт не привязан к ученику';
+    raise exception 'Ссылка недействительна';
   end if;
 
   select value into v_value from public.app_kv where user_id = v_tutor and key = 'homework';
@@ -278,4 +234,4 @@ begin
 end;
 $$;
 
-grant execute on function public.student_mark_homework_done(text) to authenticated;
+grant execute on function public.portal_mark_homework_done(text, text) to anon, authenticated;
