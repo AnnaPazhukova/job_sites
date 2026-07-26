@@ -1,5 +1,7 @@
 -- TutorSpace data storage: one key/value row per app data slice per user.
--- Run this once in the Supabase SQL Editor (Project → SQL Editor → New query).
+-- Run this in the Supabase SQL Editor (Project → SQL Editor → New query).
+-- Safe to re-run any time the app updates and this file changes — every
+-- statement is idempotent (create-if-not-exists / drop-then-create).
 
 create table if not exists public.app_kv (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -11,15 +13,19 @@ create table if not exists public.app_kv (
 
 alter table public.app_kv enable row level security;
 
+drop policy if exists "read own data" on public.app_kv;
 create policy "read own data" on public.app_kv
   for select using (auth.uid() = user_id);
 
+drop policy if exists "write own data" on public.app_kv;
 create policy "write own data" on public.app_kv
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "update own data" on public.app_kv;
 create policy "update own data" on public.app_kv
   for update using (auth.uid() = user_id);
 
+drop policy if exists "delete own data" on public.app_kv;
 create policy "delete own data" on public.app_kv
   for delete using (auth.uid() = user_id);
 
@@ -31,12 +37,15 @@ insert into storage.buckets (id, name, public)
 values ('attachments', 'attachments', true)
 on conflict (id) do nothing;
 
+drop policy if exists "read attachments" on storage.objects;
 create policy "read attachments" on storage.objects
   for select using (bucket_id = 'attachments');
 
+drop policy if exists "upload own attachments" on storage.objects;
 create policy "upload own attachments" on storage.objects
   for insert with check (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "delete own attachments" on storage.objects;
 create policy "delete own attachments" on storage.objects
   for delete using (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
 
