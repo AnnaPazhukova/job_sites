@@ -1,5 +1,14 @@
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
+// A student portal access link is a permanent bearer credential (see
+// studentAuth.ts), so it needs real cryptographic randomness rather than
+// Math.random() — this produces a 192-bit hex token.
+export function secureToken(bytes = 24): string {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
