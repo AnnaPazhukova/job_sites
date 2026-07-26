@@ -30,7 +30,7 @@ export default function StudentPortal({ code, onExit }: Props) {
   const [notes, setNotes] = useState<MethodNote[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<"invalid" | "setup" | null>(null);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -52,8 +52,12 @@ export default function StudentPortal({ code, onExit }: Props) {
         setHomework(h);
         setNotes(n);
         setMessages(m);
-      } catch {
-        setNotFound(true);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        // A missing-function/schema-cache error means the database wasn't
+        // migrated to this version yet — very different from a genuinely
+        // revoked/wrong link, so it shouldn't show the same message.
+        setLoadError(/does not exist|schema cache|not find the function/i.test(msg) ? "setup" : "invalid");
       } finally {
         setLoading(false);
       }
@@ -107,7 +111,12 @@ export default function StudentPortal({ code, onExit }: Props) {
       </header>
 
       <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-6">
-        {notFound ? (
+        {loadError === "setup" ? (
+          <div className="py-24 text-center text-gray-500">
+            <div className="font-semibold text-lg mb-1">Кабинет временно недоступен</div>
+            <div className="text-sm">Похоже, сайт обновился, а база данных — ещё нет. Попросите репетитора выполнить обновлённый supabase/schema.sql и попробуйте снова.</div>
+          </div>
+        ) : loadError === "invalid" ? (
           <div className="py-24 text-center text-gray-500">
             <div className="font-semibold text-lg mb-1">Ссылка недействительна</div>
             <div className="text-sm">Возможно, репетитор отключил доступ по этой ссылке. Попросите новую.</div>
