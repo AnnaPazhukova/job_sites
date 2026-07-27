@@ -32,9 +32,15 @@ import {
   type RecurrenceFreq,
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
-import type { Homework, Lesson, MessagesByStudent, Student, ViewId } from "../lib/types";
+import type { Homework, HomeworkStatus, Lesson, MessagesByStudent, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
+
+const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> = {
+  assigned: { label: "Не сдано", color: "bg-gray-100 text-gray-500" },
+  submitted: { label: "На проверке", color: "bg-amber-50 text-amber-600" },
+  done: { label: "Проверено", color: "bg-emerald-50 text-emerald-600" },
+};
 
 interface Props {
   students: Student[];
@@ -584,12 +590,28 @@ export function LessonFormModal({
   }
 
   return (
-    <Modal title={isEdit ? "Занятие" : "Добавление занятия"} onClose={onClose} wide>
+    <Modal
+      title={isPast ? `Урок · ${fmtDateRu(lesson!.date)}` : isEdit ? "Занятие" : "Добавление занятия"}
+      onClose={onClose}
+      wide={!isPast}
+      full={isPast}
+    >
       {isEdit && (
         <div className="flex items-center gap-2 mb-5 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-blue-50 text-[#2563EB]">
-            <Clock size={15} /> Запланировано
-          </span>
+          {isPast ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600">
+                <User size={15} /> {studentName}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600">
+                <Clock size={15} /> {time} · {duration} мин · {price} ₽
+              </span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-blue-50 text-[#2563EB]">
+              <Clock size={15} /> Запланировано
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setPaymentStatus((p) => (p === "paid" ? "pending" : "paid"))}
@@ -603,34 +625,38 @@ export function LessonFormModal({
       )}
 
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Ученик">
-          <TextInput icon={User} value={studentName} readOnly />
-        </Field>
+        {!isPast && (
+          <>
+            <Field label="Ученик">
+              <TextInput icon={User} value={studentName} readOnly />
+            </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Дата">
-            <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </Field>
-          <Field label="Время">
-            <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Длительность, мин">
-            <TextInput type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
-          </Field>
-          <Field label="Стоимость, ₽">
-            <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-          </Field>
-        </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Дата">
+                <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </Field>
+              <Field label="Время">
+                <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Длительность, мин">
+                <TextInput type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+              </Field>
+              <Field label="Стоимость, ₽">
+                <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+              </Field>
+            </div>
+          </>
+        )}
 
         {isPast && (
-          <>
+          <div className="grid sm:grid-cols-2 gap-5">
             <Field label="Комментарий об уроке">
               <TextArea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                rows={3}
+                rows={8}
                 placeholder="Как прошёл урок, что отработали, на что обратить внимание..."
               />
             </Field>
@@ -644,19 +670,15 @@ export function LessonFormModal({
                       <span className="text-sm flex items-center gap-1.5">
                         <BookOpen size={14} className="text-gray-400 shrink-0" /> {linkedHomework.title}
                       </span>
-                      <span
-                        className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${
-                          linkedHomework.status === "done" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                        }`}
-                      >
-                        {linkedHomework.status === "done" ? "Проверено" : "На проверке"}
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[linkedHomework.status].color}`}>
+                        {HW_STATUS_META[linkedHomework.status].label}
                       </span>
                     </div>
                     {linkedHomework.due && <div className="text-xs text-gray-400 mt-1">Срок: {fmtDateRu(linkedHomework.due)}</div>}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={2} placeholder="Что задать на дом..." />
+                    <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={5} placeholder="Что задать на дом..." />
                     <GhostButton icon={BookOpen} onClick={assignHomework} disabled={!hwText.trim()}>
                       Задать домашнее задание
                     </GhostButton>
@@ -667,7 +689,7 @@ export function LessonFormModal({
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
 
         {!isEdit && (
