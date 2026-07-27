@@ -99,7 +99,7 @@ export function buildHomeworkAssignment(
     studentName,
     title,
     due,
-    status: "pending",
+    status: "assigned",
     lessonId: lesson.id,
   };
   const message: ChatMessage = {

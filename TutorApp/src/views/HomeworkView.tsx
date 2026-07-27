@@ -16,15 +16,16 @@ interface Props {
 }
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  pending: { label: "На проверке", color: "bg-amber-50 text-amber-600" },
+  assigned: { label: "Не сдано", color: "bg-gray-100 text-gray-500" },
+  submitted: { label: "На проверке", color: "bg-amber-50 text-amber-600" },
   done: { label: "Проверено", color: "bg-emerald-50 text-emerald-600" },
   overdue: { label: "Просрочено", color: "bg-red-50 text-red-600" },
 };
 
 function effectiveStatus(h: Homework) {
   if (h.status === "done") return "done";
-  if (h.due && h.due < TODAY_KEY) return "overdue";
-  return "pending";
+  if (h.status === "assigned" && h.due && h.due < TODAY_KEY) return "overdue";
+  return h.status;
 }
 
 export function HomeworkView({ homework, setHomework, students, lessons, notes, onOpenNote, showToast }: Props) {
@@ -52,7 +53,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     lessonId?: string;
     attachments: Attachment[];
   }) {
-    setHomework([{ id: uid(), status: "pending", ...data }, ...homework]);
+    setHomework([{ id: uid(), status: "assigned", ...data }, ...homework]);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");
   }
@@ -74,7 +75,8 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
             </div>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2.5 rounded-xl bg-white border border-gray-300 shadow-sm text-sm">
               <option value="all">Все статусы</option>
-              <option value="pending">На проверке</option>
+              <option value="assigned">Не сдано</option>
+              <option value="submitted">На проверке</option>
               <option value="done">Проверено</option>
               <option value="overdue">Просрочено</option>
             </select>

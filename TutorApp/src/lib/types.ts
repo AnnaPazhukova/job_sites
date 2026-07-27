@@ -47,7 +47,10 @@ export interface Lesson {
   comment?: string;
 }
 
-export type HomeworkStatus = "pending" | "done";
+// assigned: given to the student, not yet turned in.
+// submitted: the student marked it done — awaiting the tutor's review.
+// done: the tutor has reviewed and confirmed it.
+export type HomeworkStatus = "assigned" | "submitted" | "done";
 
 export interface Attachment {
   id: string;

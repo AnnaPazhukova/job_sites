@@ -81,7 +81,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedFlagsLoaded]);
 
-  const pendingHw = homework.filter((h) => h.status === "pending").length;
+  const pendingHw = homework.filter((h) => h.status === "submitted").length;
   const dueUnpaid = lessons.filter((l) => l.status !== "cancelled" && l.paymentStatus !== "paid" && l.date <= TODAY_KEY).length;
 
   function handleBellClick() {
