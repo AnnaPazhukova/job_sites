@@ -10,16 +10,25 @@ const BUCKET = "attachments";
 
 export const fileStorageEnabled = Boolean(supabase);
 
-export async function uploadAttachment(file: File): Promise<Attachment> {
+// `folder` overrides the default per-tutor (auth.uid()) folder — used by
+// the student portal, which has no Supabase Auth session at all (access is
+// by link code, see studentAuth.ts). Passing `portal-<code>` there matches
+// the matching storage policy in supabase/schema.sql, which authorizes the
+// upload by checking the code against student_invites instead of auth.uid().
+export async function uploadAttachment(file: File, folder?: string): Promise<Attachment> {
   if (!supabase) throw new Error("Хранилище файлов недоступно");
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const userId = session?.user.id;
-  if (!userId) throw new Error("Не авторизован");
+
+  let owner = folder;
+  if (!owner) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    owner = session?.user.id;
+  }
+  if (!owner) throw new Error("Не авторизован");
 
   const id = uid();
-  const path = `${userId}/${id}-${file.name}`;
+  const path = `${owner}/${id}-${file.name}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
 

@@ -351,7 +351,9 @@ function MessagesTab({
         ))}
       </div>
       <div className="p-3 border-t border-[#F0F1F4] space-y-2">
-        {showAttach && <AttachmentsField attachments={pendingFiles} onChange={setPendingFiles} label="Прикрепить к сообщению" />}
+        {showAttach && (
+          <AttachmentsField attachments={pendingFiles} onChange={setPendingFiles} label="Прикрепить к сообщению" folder={`portal-${code}`} />
+        )}
         <div className="flex gap-2">
           <button
             type="button"

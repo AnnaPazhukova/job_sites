@@ -7,9 +7,10 @@ interface Props {
   attachments: Attachment[];
   onChange: (next: Attachment[]) => void;
   label?: string;
+  folder?: string;
 }
 
-export function AttachmentsField({ attachments, onChange, label = "Файлы" }: Props) {
+export function AttachmentsField({ attachments, onChange, label = "Файлы", folder }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,7 @@ export function AttachmentsField({ attachments, onChange, label = "Файлы" }
     setUploading(true);
     setError(null);
     try {
-      const uploaded = await Promise.all(Array.from(files).map(uploadAttachment));
+      const uploaded = await Promise.all(Array.from(files).map((f) => uploadAttachment(f, folder)));
       onChange([...attachments, ...uploaded]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить файл");

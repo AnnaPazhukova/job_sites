@@ -83,6 +83,20 @@ drop policy if exists "tutor manages own invites" on public.student_invites;
 create policy "tutor manages own invites" on public.student_invites
   for all using (auth.uid() = tutor_id) with check (auth.uid() = tutor_id);
 
+-- Lets a student (no Supabase Auth session — see the comment above) upload
+-- attachments too: their folder is "portal-<code>" instead of auth.uid(),
+-- authorized by the code existing in student_invites rather than identity.
+drop policy if exists "portal upload own attachments" on storage.objects;
+create policy "portal upload own attachments" on storage.objects
+  for insert with check (
+    bucket_id = 'attachments'
+    and (storage.foldername(name))[1] like 'portal-%'
+    and exists (
+      select 1 from public.student_invites
+      where code = substring((storage.foldername(name))[1] from 8)
+    )
+  );
+
 -- Returns just the link code's own slice of a given data key ('students',
 -- 'lessons', 'homework', 'messages', or 'linked-notes'), read from the
 -- linked tutor's app_kv row. Anything not matching the student's id is
