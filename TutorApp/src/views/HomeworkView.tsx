@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
@@ -23,9 +23,10 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 };
 
 function effectiveStatus(h: Homework) {
-  if (h.status === "done") return "done";
-  if (h.status === "assigned" && h.due && h.due < TODAY_KEY) return "overdue";
-  return h.status;
+  const status = normalizeHomeworkStatus(h.status);
+  if (status === "done") return "done";
+  if (status === "assigned" && h.due && h.due < TODAY_KEY) return "overdue";
+  return status;
 }
 
 export function HomeworkView({ homework, setHomework, students, lessons, notes, onOpenNote, showToast }: Props) {

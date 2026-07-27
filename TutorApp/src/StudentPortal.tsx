@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, PageHeader } from "./components/ui";
 import { AttachmentsField } from "./components/Attachments";
-import { fmtDateRu, MONTHS_RU, TODAY } from "./lib/utils";
+import { fmtDateRu, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -220,10 +220,10 @@ export default function StudentPortal({ code, onExit }: Props) {
                               <div className="text-xs text-gray-500 mt-0.5">{h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[h.status].color}`}>
-                                {HW_STATUS_META[h.status].label}
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[normalizeHomeworkStatus(h.status)].color}`}>
+                                {HW_STATUS_META[normalizeHomeworkStatus(h.status)].label}
                               </span>
-                              {h.status === "assigned" && (
+                              {normalizeHomeworkStatus(h.status) === "assigned" && (
                                 <button
                                   onClick={() => submitHomework(h.id)}
                                   className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition"

@@ -1,6 +1,15 @@
-import type { ChatMessage, Homework, Lesson } from "./types";
+import type { ChatMessage, Homework, HomeworkStatus, Lesson } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+// Homework records created before the assigned/submitted/done split still
+// carry the old "pending" status string in stored data. Normalize any
+// unrecognized value to "assigned" (closest equivalent — under the old
+// model nothing moved to "done" without the tutor confirming it) so status
+// lookups never index a map with an unknown key and crash.
+export function normalizeHomeworkStatus(status: string): HomeworkStatus {
+  return status === "submitted" || status === "done" || status === "assigned" ? status : "assigned";
+}
 
 // A student portal access link is a permanent bearer credential (see
 // studentAuth.ts), so it needs real cryptographic randomness rather than
