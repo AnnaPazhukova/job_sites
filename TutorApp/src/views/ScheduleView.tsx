@@ -8,6 +8,7 @@ import {
   lessonPillStyle,
   MONTHS_RU,
   TODAY,
+  TODAY_KEY,
   WEEKDAYS_RU,
   uid,
   type RecurrenceEnd,
@@ -106,10 +107,13 @@ export function ScheduleView({
 
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
+    const isPast = l.date < TODAY_KEY;
     const color = students.find((s) => s.id === l.studentId)?.color;
-    const style = lessonPillStyle(color);
+    const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
-    return { className: "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]", style: undefined };
+    return isPast
+      ? { className: "bg-blue-100 text-blue-800 hover:bg-blue-200", style: undefined }
+      : { className: "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]", style: undefined };
   }
 
   function openAdd(date: Date) {
