@@ -1,3 +1,5 @@
+import type { ChatMessage, Homework, Lesson } from "./types";
+
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 // A student portal access link is a permanent bearer credential (see
@@ -70,6 +72,43 @@ export const TODAY_KEY = dateKey(TODAY);
 
 export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
+}
+
+// The date of a student's next non-cancelled lesson after the given one —
+// used as the default homework due date ("due by the next lesson").
+export function nextLessonDate(lessons: Lesson[], studentId: string, afterDate: string, afterTime: string): string | null {
+  const upcoming = lessons
+    .filter((l) => l.studentId === studentId && l.status !== "cancelled" && (l.date > afterDate || (l.date === afterDate && l.time > afterTime)))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  return upcoming[0]?.date ?? null;
+}
+
+// Assigning homework from a lesson creates both the Homework record (due by
+// the student's next lesson, linked back to this one) and a chat message
+// announcing it, so the student sees it in Сообщения right away.
+export function buildHomeworkAssignment(
+  lesson: Lesson,
+  studentName: string,
+  title: string,
+  lessons: Lesson[]
+): { homework: Homework; message: ChatMessage } {
+  const due = nextLessonDate(lessons, lesson.studentId!, lesson.date, lesson.time);
+  const homework: Homework = {
+    id: uid(),
+    studentId: lesson.studentId!,
+    studentName,
+    title,
+    due,
+    status: "pending",
+    lessonId: lesson.id,
+  };
+  const message: ChatMessage = {
+    id: uid(),
+    from: "me",
+    text: due ? `Задано домашнее задание: ${title} (срок: ${fmtDateRu(due)})` : `Задано домашнее задание: ${title}`,
+    at: Date.now(),
+  };
+  return { homework, message };
 }
 
 export type RecurrenceFreq = "daily" | "weekly" | "monthly";

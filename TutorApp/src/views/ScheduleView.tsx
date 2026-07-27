@@ -1,8 +1,19 @@
 import { useMemo, useState } from "react";
 import { Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
 import { Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
-import { buildRecurringDates, dateKey, lessonPillStyle, MONTHS_RU, TODAY, WEEKDAYS_RU, uid, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
-import type { Group, Lesson, Student, WeeklyTemplateSlot } from "../lib/types";
+import {
+  buildHomeworkAssignment,
+  buildRecurringDates,
+  dateKey,
+  lessonPillStyle,
+  MONTHS_RU,
+  TODAY,
+  WEEKDAYS_RU,
+  uid,
+  type RecurrenceEnd,
+  type RecurrenceFreq,
+} from "../lib/utils";
+import type { Group, Homework, Lesson, MessagesByStudent, Student, WeeklyTemplateSlot } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { LessonFormModal } from "./StudentDetailView";
@@ -20,10 +31,27 @@ interface Props {
   groups: Group[];
   weeklyTemplate: WeeklyTemplateSlot[];
   setWeeklyTemplate: (t: WeeklyTemplateSlot[]) => void;
+  homework: Homework[];
+  setHomework: (h: Homework[]) => void;
+  messages: MessagesByStudent;
+  setMessages: (m: MessagesByStudent) => void;
   showToast: (t: string) => void;
 }
 
-export function ScheduleView({ lessons, setLessons, students, setStudents, groups, weeklyTemplate, setWeeklyTemplate, showToast }: Props) {
+export function ScheduleView({
+  lessons,
+  setLessons,
+  students,
+  setStudents,
+  groups,
+  weeklyTemplate,
+  setWeeklyTemplate,
+  homework,
+  setHomework,
+  messages,
+  setMessages,
+  showToast,
+}: Props) {
   const [mode, setMode] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState(TODAY);
   const [showAdd, setShowAdd] = useState(false);
@@ -114,6 +142,15 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
     setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)));
     showToast("Занятие отменено");
     setEditLesson(null);
+  }
+
+  function handleAssignHomework(title: string) {
+    if (!editLesson || !editLesson.studentId) return;
+    const st = students.find((s) => s.id === editLesson.studentId);
+    const { homework: hw, message } = buildHomeworkAssignment(editLesson, st?.name || editLesson.title, title, lessons);
+    setHomework([...homework, hw]);
+    setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
+    showToast("Домашнее задание задано");
   }
 
   function goPrev() {
@@ -304,6 +341,8 @@ export function ScheduleView({ lessons, setLessons, students, setStudents, group
           defaultRate={editLesson.price}
           defaultDuration={editLesson.duration}
           lesson={editLesson}
+          homework={homework}
+          onAssignHomework={handleAssignHomework}
           onClose={() => setEditLesson(null)}
           onSave={saveLessonEdit}
           onCancelLesson={() => cancelLessonEdit(editLesson.id)}
