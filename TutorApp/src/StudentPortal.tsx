@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Calendar, Check, CheckCircle2, Clock, Layers, LogOut, MessageCircle, Paperclip, Send, Wallet } from "lucide-react";
+import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, PageHeader } from "./components/ui";
 import { AttachmentsField } from "./components/Attachments";
-import { fmtDateRu, TODAY_KEY } from "./lib/utils";
+import { fmtDateRu, MONTHS_RU, TODAY } from "./lib/utils";
+import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
   fetchStudentLessons,
@@ -23,6 +24,7 @@ interface Props {
 
 export default function StudentPortal({ code, onExit }: Props) {
   const [tab, setTab] = useState<Tab>("schedule");
+  const [weekCursor, setWeekCursor] = useState(TODAY);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Student | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -65,12 +67,24 @@ export default function StudentPortal({ code, onExit }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  const upcoming = lessons
-    .filter((l) => l.status !== "cancelled" && l.date >= TODAY_KEY)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.time?.localeCompare(b.time));
-  const past = lessons
-    .filter((l) => l.status === "cancelled" || l.date < TODAY_KEY)
-    .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
+  const weekDays = getWeekDays(weekCursor);
+  const weekLabel = `${weekDays[0].getDate()} ${MONTHS_RU[weekDays[0].getMonth()].toLowerCase()} – ${weekDays[6].getDate()} ${MONTHS_RU[weekDays[6].getMonth()].toLowerCase()}`;
+
+  function goPrevWeek() {
+    setWeekCursor((c) => {
+      const d = new Date(c);
+      d.setDate(d.getDate() - 7);
+      return d;
+    });
+  }
+
+  function goNextWeek() {
+    setWeekCursor((c) => {
+      const d = new Date(c);
+      d.setDate(d.getDate() + 7);
+      return d;
+    });
+  }
 
   async function markDone(id: string) {
     setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "done" } : h)));
@@ -145,28 +159,38 @@ export default function StudentPortal({ code, onExit }: Props) {
             </div>
 
             {tab === "schedule" && (
-              <div className="space-y-5">
-                <div>
-                  <div className="font-semibold text-sm text-gray-500 mb-2">Ближайшие занятия</div>
-                  {upcoming.length === 0 ? (
-                    <EmptyState icon={Calendar} title="Занятий не запланировано" />
-                  ) : (
-                    <Card className="divide-y divide-[#F0F1F4]">
-                      {upcoming.map((l) => (
-                        <LessonRow key={l.id} lesson={l} />
-                      ))}
-                    </Card>
-                  )}
-                </div>
-                {past.length > 0 && (
-                  <div>
-                    <div className="font-semibold text-sm text-gray-500 mb-2">Прошедшие занятия</div>
-                    <Card className="divide-y divide-[#F0F1F4]">
-                      {past.slice(0, 20).map((l) => (
-                        <LessonRow key={l.id} lesson={l} />
-                      ))}
-                    </Card>
+              <div>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <div className="text-lg font-bold">{weekLabel}</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setWeekCursor(TODAY)}
+                      className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition"
+                    >
+                      Сегодня
+                    </button>
+                    <div className="flex items-center bg-white border border-gray-300 shadow-sm rounded-xl">
+                      <button onClick={goPrevWeek} className="p-2 hover:bg-gray-50 rounded-l-xl">
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button onClick={goNextWeek} className="p-2 hover:bg-gray-50 rounded-r-xl">
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
+                </div>
+                {lessons.length === 0 ? (
+                  <EmptyState icon={Calendar} title="Занятий не запланировано" />
+                ) : (
+                  <Card className="overflow-hidden">
+                    <WeekView
+                      cursor={weekCursor}
+                      lessons={lessons}
+                      students={profile ? [profile] : []}
+                      onDayClick={() => {}}
+                      onLessonClick={() => {}}
+                    />
+                  </Card>
                 )}
               </div>
             )}
@@ -245,32 +269,6 @@ export default function StudentPortal({ code, onExit }: Props) {
           <CheckCircle2 size={16} className="text-emerald-400" />
           {toast}
         </div>
-      )}
-    </div>
-  );
-}
-
-function LessonRow({ lesson }: { lesson: Lesson }) {
-  const cancelled = lesson.status === "cancelled";
-  return (
-    <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3.5">
-      <span className="text-sm font-medium w-24 shrink-0">{fmtDateRu(lesson.date)}</span>
-      <span className="text-sm text-gray-500 flex items-center gap-1 shrink-0">
-        <Clock size={13} /> {lesson.time} · {lesson.duration} мин
-      </span>
-      <span
-        className={`text-xs font-medium px-2.5 py-1 rounded-lg shrink-0 ${cancelled ? "bg-gray-100 text-gray-400" : "bg-blue-50 text-[#2563EB]"}`}
-      >
-        {cancelled ? "Отменено" : "Запланировано"}
-      </span>
-      {!cancelled && (
-        <span
-          className={`text-xs font-medium px-2.5 py-1 rounded-lg flex items-center gap-1 shrink-0 ${
-            lesson.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"
-          }`}
-        >
-          <Wallet size={12} /> {lesson.paymentStatus === "paid" ? "Оплачено" : "Ожидает оплаты"}
-        </span>
       )}
     </div>
   );
