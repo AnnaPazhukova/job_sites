@@ -44,6 +44,7 @@ export interface Lesson {
   price: number;
   status: LessonStatus;
   paymentStatus: PaymentStatus;
+  comment?: string;
 }
 
 export type HomeworkStatus = "pending" | "done";

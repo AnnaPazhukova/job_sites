@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  BookOpen,
   Cake,
   Calendar as CalendarIcon,
   Check,
@@ -18,10 +19,20 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, RecurrenceFields, Select, TextInput } from "../components/ui";
-import { buildRecurringDates, fmtDateRu, GRADES, SUBSCRIPTION_SIZES, TODAY_KEY, uid, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, RecurrenceFields, Select, TextArea, TextInput } from "../components/ui";
+import {
+  buildHomeworkAssignment,
+  buildRecurringDates,
+  fmtDateRu,
+  GRADES,
+  SUBSCRIPTION_SIZES,
+  TODAY_KEY,
+  uid,
+  type RecurrenceEnd,
+  type RecurrenceFreq,
+} from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
-import type { Homework, Lesson, Student, ViewId } from "../lib/types";
+import type { Homework, Lesson, MessagesByStudent, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
 
@@ -31,12 +42,27 @@ interface Props {
   lessons: Lesson[];
   setLessons: (l: Lesson[]) => void;
   homework: Homework[];
+  setHomework: (h: Homework[]) => void;
+  messages: MessagesByStudent;
+  setMessages: (m: MessagesByStudent) => void;
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
 }
 
-export function StudentDetailPage({ students, setStudents, lessons, setLessons, homework, selectedStudentId, setView, showToast }: Props) {
+export function StudentDetailPage({
+  students,
+  setStudents,
+  lessons,
+  setLessons,
+  homework,
+  setHomework,
+  messages,
+  setMessages,
+  selectedStudentId,
+  setView,
+  showToast,
+}: Props) {
   const student = students.find((s) => s.id === selectedStudentId);
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
@@ -153,6 +179,15 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
     showToast("Занятие отменено");
     setShowLessonForm(false);
     setEditLesson(null);
+  }
+
+  function handleAssignHomework(title: string) {
+    if (!editLesson || !editLesson.studentId) return;
+    const st = students.find((s) => s.id === editLesson.studentId);
+    const { homework: hw, message } = buildHomeworkAssignment(editLesson, st?.name || editLesson.title, title, lessons);
+    setHomework([...homework, hw]);
+    setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
+    showToast("Домашнее задание задано");
   }
 
   return (
@@ -450,6 +485,8 @@ export function StudentDetailPage({ students, setStudents, lessons, setLessons, 
           defaultRate={student.rate || 0}
           defaultDuration={student.duration || 60}
           lesson={editLesson}
+          homework={homework}
+          onAssignHomework={handleAssignHomework}
           onClose={() => {
             setShowLessonForm(false);
             setEditLesson(null);
@@ -486,24 +523,41 @@ interface LessonFormProps {
   defaultRate: number;
   defaultDuration: number;
   lesson: Lesson | null;
+  homework?: Homework[];
+  onAssignHomework?: (title: string) => void;
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
   onCancelLesson: (() => void) | null;
 }
 
-export function LessonFormModal({ studentName, defaultRate, defaultDuration, lesson, onClose, onSave, onCancelLesson }: LessonFormProps) {
+export function LessonFormModal({
+  studentName,
+  defaultRate,
+  defaultDuration,
+  lesson,
+  homework = [],
+  onAssignHomework,
+  onClose,
+  onSave,
+  onCancelLesson,
+}: LessonFormProps) {
   const isEdit = !!lesson;
   const [date, setDate] = useState(lesson?.date || TODAY_KEY);
   const [time, setTime] = useState(lesson?.time || "15:00");
   const [duration, setDuration] = useState(lesson?.duration || defaultDuration || 60);
   const [price, setPrice] = useState(lesson?.price ?? defaultRate ?? 0);
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
+  const [comment, setComment] = useState(lesson?.comment || "");
+  const [hwText, setHwText] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
   const [days, setDays] = useState<number[]>([]);
   const [endType, setEndType] = useState<RecurrenceEnd>("count");
   const [count, setCount] = useState(8);
   const [untilDate, setUntilDate] = useState("");
+
+  const isPast = isEdit && lesson!.date <= TODAY_KEY;
+  const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
 
   function toggleDay(d: number) {
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
@@ -517,10 +571,16 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (isEdit) {
-      onSave({ id: lesson!.id, date, time, duration: Number(duration), price: Number(price), paymentStatus });
+      onSave({ id: lesson!.id, date, time, duration: Number(duration), price: Number(price), paymentStatus, comment });
     } else {
       onSave({ date, time, duration: Number(duration), price: Number(price), occurrences: buildOccurrences() });
     }
+  }
+
+  function assignHomework() {
+    if (!hwText.trim() || !onAssignHomework) return;
+    onAssignHomework(hwText.trim());
+    setHwText("");
   }
 
   return (
@@ -563,6 +623,52 @@ export function LessonFormModal({ studentName, defaultRate, defaultDuration, les
             <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
           </Field>
         </div>
+
+        {isPast && (
+          <>
+            <Field label="Комментарий об уроке">
+              <TextArea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+                placeholder="Как прошёл урок, что отработали, на что обратить внимание..."
+              />
+            </Field>
+
+            {lesson!.studentId && (
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1.5">Домашнее задание</div>
+                {linkedHomework ? (
+                  <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm flex items-center gap-1.5">
+                        <BookOpen size={14} className="text-gray-400 shrink-0" /> {linkedHomework.title}
+                      </span>
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${
+                          linkedHomework.status === "done" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                        }`}
+                      >
+                        {linkedHomework.status === "done" ? "Проверено" : "На проверке"}
+                      </span>
+                    </div>
+                    {linkedHomework.due && <div className="text-xs text-gray-400 mt-1">Срок: {fmtDateRu(linkedHomework.due)}</div>}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={2} placeholder="Что задать на дом..." />
+                    <GhostButton icon={BookOpen} onClick={assignHomework} disabled={!hwText.trim()}>
+                      Задать домашнее задание
+                    </GhostButton>
+                    <div className="text-xs text-gray-400">
+                      Срок — до следующего занятия. Задание сразу появится в переписке с учеником.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
 
         {!isEdit && (
           <RecurrenceFields

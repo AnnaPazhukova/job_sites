@@ -178,6 +178,9 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   lessons={lessons}
                   setLessons={setLessons}
                   homework={homework}
+                  setHomework={setHomework}
+                  messages={messages}
+                  setMessages={setMessages}
                   selectedStudentId={selectedStudentId}
                   setView={setView}
                   showToast={showToast}
@@ -193,6 +196,10 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   groups={groups}
                   weeklyTemplate={weeklyTemplate}
                   setWeeklyTemplate={setWeeklyTemplate}
+                  homework={homework}
+                  setHomework={setHomework}
+                  messages={messages}
+                  setMessages={setMessages}
                   showToast={showToast}
                 />
               )}
