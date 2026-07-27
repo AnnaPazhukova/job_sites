@@ -205,7 +205,9 @@ $$;
 
 grant execute on function public.portal_send_message(text, text, jsonb) to anon, authenticated;
 
--- Marks one of the link code's own homework items as done.
+-- Marks one of the link code's own homework items as submitted — the
+-- student says they've done it; the tutor still needs to review and
+-- confirm it (see the "done" status, set only by the tutor).
 create or replace function public.portal_mark_homework_done(p_code text, p_homework_id text)
 returns void
 language plpgsql
@@ -233,7 +235,7 @@ begin
   select coalesce(jsonb_agg(
     case
       when elem->>'id' = p_homework_id and elem->>'studentId' = v_student
-      then jsonb_set(elem, '{status}', '"done"')
+      then jsonb_set(elem, '{status}', '"submitted"')
       else elem
     end
   ), '[]'::jsonb) into v_next

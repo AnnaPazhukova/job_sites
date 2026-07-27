@@ -13,9 +13,15 @@ import {
   markStudentHomeworkDone,
   sendStudentMessage,
 } from "./lib/studentData";
-import type { Attachment, ChatMessage, Homework, Lesson, MethodNote, Student } from "./lib/types";
+import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "./lib/types";
 
 type Tab = "schedule" | "messages" | "homework";
+
+const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> = {
+  assigned: { label: "Не сдано", color: "bg-gray-100 text-gray-500" },
+  submitted: { label: "На проверке", color: "bg-amber-50 text-amber-600" },
+  done: { label: "Проверено", color: "bg-emerald-50 text-emerald-600" },
+};
 
 interface Props {
   code: string;
@@ -86,11 +92,11 @@ export default function StudentPortal({ code, onExit }: Props) {
     });
   }
 
-  async function markDone(id: string) {
-    setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "done" } : h)));
+  async function submitHomework(id: string) {
+    setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "submitted" } : h)));
     try {
       await markStudentHomeworkDone(code, id);
-      showToast("Отмечено как сделано");
+      showToast("Отправлено репетитору на проверку");
     } catch {
       showToast("Не удалось сохранить, попробуйте ещё раз");
     }
@@ -214,16 +220,15 @@ export default function StudentPortal({ code, onExit }: Props) {
                               <div className="text-xs text-gray-500 mt-0.5">{h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span
-                                className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
-                                  h.status === "done" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                                }`}
-                              >
-                                {h.status === "done" ? "Сделано" : "В работе"}
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[h.status].color}`}>
+                                {HW_STATUS_META[h.status].label}
                               </span>
-                              {h.status !== "done" && (
-                                <button onClick={() => markDone(h.id)} className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600">
-                                  <Check size={16} />
+                              {h.status === "assigned" && (
+                                <button
+                                  onClick={() => submitHomework(h.id)}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition"
+                                >
+                                  <Check size={13} /> Сдать
                                 </button>
                               )}
                             </div>
