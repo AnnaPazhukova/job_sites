@@ -25,6 +25,7 @@ import {
   buildRecurringDates,
   fmtDateRu,
   GRADES,
+  normalizeHomeworkStatus,
   SUBSCRIPTION_SIZES,
   TODAY_KEY,
   uid,
@@ -670,8 +671,8 @@ export function LessonFormModal({
                       <span className="text-sm flex items-center gap-1.5">
                         <BookOpen size={14} className="text-gray-400 shrink-0" /> {linkedHomework.title}
                       </span>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[linkedHomework.status].color}`}>
-                        {HW_STATUS_META[linkedHomework.status].label}
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].color}`}>
+                        {HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].label}
                       </span>
                     </div>
                     {linkedHomework.due && <div className="text-xs text-gray-400 mt-1">Срок: {fmtDateRu(linkedHomework.due)}</div>}
