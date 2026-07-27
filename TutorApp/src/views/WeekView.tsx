@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { dateKey, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
+import { dateKey, lessonPillStyle, TODAY, TODAY_KEY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
@@ -47,11 +47,18 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
+    const isPast = l.date < TODAY_KEY;
     const color = students.find((s) => s.id === l.studentId)?.color;
-    const style = lessonPillStyle(color);
+    const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
+    if (l.paymentStatus === "paid") {
+      return {
+        className: isPast ? "bg-emerald-200 text-emerald-900 hover:bg-emerald-300" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+        style: undefined,
+      };
+    }
     return {
-      className: l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]",
+      className: isPast ? "bg-blue-200 text-blue-900 hover:bg-blue-300" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]",
       style: undefined,
     };
   }

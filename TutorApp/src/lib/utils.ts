@@ -40,9 +40,11 @@ export function durationLabel(minutes: number) {
   return LESSON_DURATIONS.find((d) => d.minutes === minutes)?.label || `${minutes} мин`;
 }
 
-export function lessonPillStyle(color: string | null | undefined): { background: string; color: string } | undefined {
+// Past lessons get a noticeably darker/more saturated tint than upcoming
+// ones, so already-happened lessons are distinguishable at a glance.
+export function lessonPillStyle(color: string | null | undefined, past = false): { background: string; color: string } | undefined {
   if (!color) return undefined;
-  return { background: color + "1A", color };
+  return { background: color + (past ? "40" : "1A"), color };
 }
 
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
