@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
-import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
+import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
@@ -448,15 +448,13 @@ function AddHomeworkModal({
           {studentLessons.length === 0 && <div className="text-xs text-gray-400 mt-1">У этого ученика пока нет занятий в расписании</div>}
         </Field>
         <Field label="Урок из методики (необязательно)">
-          <select value={noteId} onChange={(e) => setNoteId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
-            <option value="">Без урока</option>
-            {notes.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.grade ? `${n.grade} · ` : ""}
-                {n.topic}
-              </option>
-            ))}
-          </select>
+          <MethodNotePicker
+            key={studentId}
+            notes={notes}
+            value={noteId}
+            onChange={setNoteId}
+            defaultGrade={students.find((s) => s.id === studentId)?.grade}
+          />
         </Field>
         <AttachmentsField attachments={attachments} onChange={setAttachments} />
         <PrimaryButton type="submit" full disabled={students.length === 0}>

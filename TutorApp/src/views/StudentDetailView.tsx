@@ -19,7 +19,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, DurationPicker, EmptyState, Field, GhostButton, Modal, PrimaryButton, RecurrenceFields, Select, TextArea, TextInput } from "../components/ui";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker, Modal, PrimaryButton, RecurrenceFields, Select, TextArea, TextInput } from "../components/ui";
 import {
   buildHomeworkAssignment,
   buildRecurringDates,
@@ -501,6 +501,7 @@ export function StudentDetailPage({
       {showLessonForm && (
         <LessonFormModal
           studentName={student.name}
+          studentGrade={student.grade}
           defaultRate={student.rate || 0}
           defaultDuration={student.duration || 60}
           lesson={editLesson}
@@ -543,6 +544,7 @@ function StudentStatBox({ color, value, label }: { color: string; value: number;
 
 interface LessonFormProps {
   studentName: string;
+  studentGrade?: string;
   defaultRate: number;
   defaultDuration: number;
   lesson: Lesson | null;
@@ -557,6 +559,7 @@ interface LessonFormProps {
 
 export function LessonFormModal({
   studentName,
+  studentGrade,
   defaultRate,
   defaultDuration,
   lesson,
@@ -698,19 +701,7 @@ export function LessonFormModal({
         {isPast && (
           <>
             <Field label="Урок из методики">
-              <select
-                value={noteId}
-                onChange={(e) => setNoteId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
-              >
-                <option value="">Не указано</option>
-                {notes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.grade ? `${n.grade} · ` : ""}
-                    {n.topic}
-                  </option>
-                ))}
-              </select>
+              <MethodNotePicker notes={notes} value={noteId} onChange={setNoteId} defaultGrade={studentGrade} />
             </Field>
 
             <div className="grid sm:grid-cols-2 gap-5">

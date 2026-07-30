@@ -1,6 +1,7 @@
-import React, { type ReactNode } from "react";
-import { X, type LucideIcon } from "lucide-react";
-import { colorFor, initials, LESSON_DURATIONS, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
+import React, { useMemo, useState, type ReactNode } from "react";
+import { Search, X, type LucideIcon } from "lucide-react";
+import { colorFor, GRADES, initials, LESSON_DURATIONS, type RecurrenceEnd, type RecurrenceFreq } from "../lib/utils";
+import type { MethodNote } from "../lib/types";
 
 export function Card({
   children,
@@ -401,6 +402,96 @@ export function DurationPicker({ value, onChange }: { value: number; onChange: (
           {d.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const selectClass = "w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm";
+
+// Picking a methodology topic to link to a lesson/homework item is painful
+// once the library has more than a handful of entries — a flat list mixing
+// every grade and subject. This narrows it down with grade/subject filters
+// (defaulting to the student's own grade, since that's almost always what
+// you want) plus free-text search over the topic name.
+export function MethodNotePicker({
+  notes,
+  value,
+  onChange,
+  defaultGrade,
+}: {
+  notes: MethodNote[];
+  value: string;
+  onChange: (id: string) => void;
+  defaultGrade?: string;
+}) {
+  const [gradeFilter, setGradeFilter] = useState(defaultGrade && GRADES.includes(defaultGrade) ? defaultGrade : "Все классы");
+  const [subjectFilter, setSubjectFilter] = useState("Все предметы");
+  const [query, setQuery] = useState("");
+
+  const grades = useMemo(() => GRADES.filter((g) => notes.some((n) => n.grade === g)), [notes]);
+  const subjects = useMemo(() => {
+    const inGrade = gradeFilter === "Все классы" ? notes : notes.filter((n) => n.grade === gradeFilter);
+    return Array.from(new Set(inGrade.map((n) => n.subject).filter(Boolean))).sort();
+  }, [notes, gradeFilter]);
+
+  const filtered = useMemo(
+    () =>
+      notes.filter(
+        (n) =>
+          (gradeFilter === "Все классы" || n.grade === gradeFilter) &&
+          (subjectFilter === "Все предметы" || n.subject === subjectFilter) &&
+          (!query.trim() || n.topic.toLowerCase().includes(query.trim().toLowerCase()))
+      ),
+    [notes, gradeFilter, subjectFilter, query]
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        <select
+          value={gradeFilter}
+          onChange={(e) => {
+            setGradeFilter(e.target.value);
+            setSubjectFilter("Все предметы");
+          }}
+          className={selectClass}
+        >
+          <option>Все классы</option>
+          {grades.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className={selectClass}>
+          <option>Все предметы</option>
+          {subjects.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск по теме..."
+          className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB]"
+        />
+      </div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>
+        <option value="">Не указано</option>
+        {filtered.map((n) => (
+          <option key={n.id} value={n.id}>
+            {n.topic}
+          </option>
+        ))}
+      </select>
+      <div className="text-xs text-gray-400">
+        {filtered.length === 0 ? "Ничего не найдено по этим фильтрам" : `Найдено тем: ${filtered.length}`}
+      </div>
     </div>
   );
 }
