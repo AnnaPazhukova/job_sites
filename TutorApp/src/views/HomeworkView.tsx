@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
@@ -313,7 +313,7 @@ function AddHomeworkModal({
 }) {
   const [studentId, setStudentId] = useState(presetLesson?.studentId || students[0]?.id || "");
   const [title, setTitle] = useState("");
-  const [due, setDue] = useState("");
+  const [due, setDue] = useState(presetLesson ? nextLessonDate(lessons, presetLesson.studentId!, presetLesson.date, presetLesson.time) || "" : "");
   const [noteId, setNoteId] = useState(presetLesson?.noteId || "");
   const [lessonId, setLessonId] = useState(presetLesson?.id || "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -321,6 +321,15 @@ function AddHomeworkModal({
   const studentLessons = lessons
     .filter((l) => l.studentId === studentId && l.status !== "cancelled")
     .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
+
+  function selectLesson(id: string) {
+    setLessonId(id);
+    const l = lessons.find((x) => x.id === id);
+    if (l) {
+      setDue(nextLessonDate(lessons, studentId, l.date, l.time) || "");
+      if (!noteId && l.noteId) setNoteId(l.noteId);
+    }
+  }
 
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
@@ -349,6 +358,7 @@ function AddHomeworkModal({
             onChange={(e) => {
               setStudentId(e.target.value);
               setLessonId("");
+              setDue("");
             }}
             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
           >
@@ -382,9 +392,12 @@ function AddHomeworkModal({
         </Field>
         <Field label="Срок сдачи">
           <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <div className="text-xs text-gray-400 mt-1">
+            Ставится автоматически по дате следующего занятия при выборе урока ниже — можно изменить вручную.
+          </div>
         </Field>
         <Field label="Урок из расписания (необязательно)">
-          <select value={lessonId} onChange={(e) => setLessonId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
+          <select value={lessonId} onChange={(e) => selectLesson(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
             <option value="">Без урока</option>
             {studentLessons.map((l) => (
               <option key={l.id} value={l.id}>
