@@ -444,20 +444,18 @@ function AddLessonModal({
         ) : (
           <div className="text-sm text-gray-400">Сначала добавьте ученика или группу</div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Время">
-            <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          </Field>
-          <Field label="Длительность, мин">
-            <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
-              {[30, 45, 60, 90, 120].map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+        <Field label="Время">
+          <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </Field>
+        <Field label="Длительность, мин">
+          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
+            {[30, 45, 60, 90, 120].map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Стоимость, ₽">
           <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
         </Field>
