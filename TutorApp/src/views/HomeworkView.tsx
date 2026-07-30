@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
+import { AlertTriangle, BookOpen, Calendar, Check, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
@@ -182,6 +182,12 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                       )}
                     </div>
                   )}
+                  {h.reviewComment && (
+                    <div className="flex items-start gap-1 mt-1.5 text-xs text-gray-500">
+                      <MessageSquareText size={12} className="shrink-0 mt-0.5 text-gray-400" />
+                      <span className="truncate">{h.reviewComment}</span>
+                    </div>
+                  )}
                 </div>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
                 {h.status !== "done" && (
@@ -240,11 +246,12 @@ export function HomeworkEditModal({
   const [due, setDue] = useState(homework.due || "");
   const [status, setStatus] = useState<HomeworkStatus>(normalizeHomeworkStatus(homework.status));
   const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
+  const [reviewComment, setReviewComment] = useState(homework.reviewComment || "");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments });
+    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments, reviewComment: reviewComment.trim() || undefined });
   }
 
   return (
@@ -278,6 +285,16 @@ export function HomeworkEditModal({
               </button>
             ))}
           </div>
+        </Field>
+        <Field label="Комментарий о выполнении">
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            rows={3}
+            placeholder="Насколько хорошо справился, на что обратить внимание в следующий раз..."
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] resize-none"
+          />
+          <div className="text-xs text-gray-400 mt-1">Увидит ученик в личном кабинете.</div>
         </Field>
         <AttachmentsField attachments={attachments} onChange={setAttachments} />
         <PrimaryButton type="submit" full>
