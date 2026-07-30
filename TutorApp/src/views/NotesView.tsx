@@ -325,7 +325,18 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                   {active.grade && <Pill tone="level">{active.grade}</Pill>}
                   {active.subject && <Pill>{active.subject}</Pill>}
                 </div>
-                {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
+                <div className="flex items-center gap-2">
+                  {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Удалить тему «${active.topic}»?`)) handleDelete(active.id);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition"
+                    title="Удалить тему"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-1 mb-4 border-b border-[#F0F1F4] overflow-x-auto">
@@ -449,10 +460,10 @@ function NoteRow({ note, active, onClick, onDelete }: { note: MethodNote; active
       <span className="truncate">{note.topic}</span>
       <Trash2
         size={13}
-        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 shrink-0 ml-2"
+        className="text-gray-300 hover:text-red-500 shrink-0 ml-2"
         onClick={(e) => {
           e.stopPropagation();
-          onDelete();
+          if (window.confirm(`Удалить тему «${note.topic}»?`)) onDelete();
         }}
       />
     </div>
