@@ -133,11 +133,11 @@ type TextInputProps = React.InputHTMLAttributes<HTMLInputElement> & { icon?: Luc
 
 export function TextInput({ icon: Icon, className = "", ...props }: TextInputProps) {
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
       {Icon && <Icon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />}
       <input
         {...props}
-        className={`w-full min-w-0 ${Icon ? "pl-10" : "pl-3.5"} pr-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] text-sm placeholder:text-gray-400 disabled:opacity-60 ${className}`}
+        className={`w-full min-w-0 max-w-full box-border ${Icon ? "pl-10" : "pl-3.5"} pr-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] text-sm placeholder:text-gray-400 disabled:opacity-60 ${className}`}
       />
     </div>
   );
