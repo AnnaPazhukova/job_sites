@@ -74,6 +74,8 @@ export interface Homework {
   attachments?: Attachment[];
   /** Tutor's feedback on the reviewed work — visible to the student too. */
   reviewComment?: string;
+  /** Grade on the Russian 2-5 school scale — visible to the student too. */
+  grade?: number;
 }
 
 export interface ChatMessage {
