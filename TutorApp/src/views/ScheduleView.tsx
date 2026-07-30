@@ -349,6 +349,7 @@ export function ScheduleView({
       {editLesson && (
         <LessonFormModal
           studentName={students.find((s) => s.id === editLesson.studentId)?.name || editLesson.title}
+          studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
           defaultRate={editLesson.price}
           defaultDuration={editLesson.duration}
           lesson={editLesson}
