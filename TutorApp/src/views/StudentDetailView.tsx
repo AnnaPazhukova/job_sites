@@ -34,7 +34,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal } from "./HomeworkView";
-import type { Homework, HomeworkStatus, Lesson, MessagesByStudent, Student, ViewId } from "../lib/types";
+import type { Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
 
@@ -53,6 +53,7 @@ interface Props {
   setHomework: (h: Homework[]) => void;
   messages: MessagesByStudent;
   setMessages: (m: MessagesByStudent) => void;
+  notes: MethodNote[];
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
@@ -67,6 +68,7 @@ export function StudentDetailPage({
   setHomework,
   messages,
   setMessages,
+  notes,
   selectedStudentId,
   setView,
   showToast,
@@ -503,6 +505,7 @@ export function StudentDetailPage({
           defaultDuration={student.duration || 60}
           lesson={editLesson}
           homework={homework}
+          notes={notes}
           onAssignHomework={handleAssignHomework}
           onUpdateHomework={handleUpdateHomework}
           onClose={() => {
@@ -544,6 +547,7 @@ interface LessonFormProps {
   defaultDuration: number;
   lesson: Lesson | null;
   homework?: Homework[];
+  notes?: MethodNote[];
   onAssignHomework?: (title: string) => void;
   onUpdateHomework?: (id: string, patch: Partial<Homework>) => void;
   onClose: () => void;
@@ -557,6 +561,7 @@ export function LessonFormModal({
   defaultDuration,
   lesson,
   homework = [],
+  notes = [],
   onAssignHomework,
   onUpdateHomework,
   onClose,
@@ -570,6 +575,7 @@ export function LessonFormModal({
   const [price, setPrice] = useState(lesson?.price ?? defaultRate ?? 0);
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
   const [comment, setComment] = useState(lesson?.comment || "");
+  const [noteId, setNoteId] = useState(lesson?.noteId || "");
   const [hwText, setHwText] = useState("");
   const [editingHw, setEditingHw] = useState(false);
   const [hwEditText, setHwEditText] = useState("");
@@ -583,6 +589,8 @@ export function LessonFormModal({
 
   const isPast = isEdit && lesson!.date <= TODAY_KEY;
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
+  const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
+  const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
 
   function toggleDay(d: number) {
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
@@ -596,7 +604,7 @@ export function LessonFormModal({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (isEdit) {
-      onSave({ id: lesson!.id, date, time, duration: Number(duration), price: Number(price), paymentStatus, comment });
+      onSave({ id: lesson!.id, date, time, duration: Number(duration), price: Number(price), paymentStatus, comment, noteId: noteId || undefined });
     } else {
       onSave({ date, time, duration: Number(duration), price: Number(price), occurrences: buildOccurrences() });
     }
@@ -606,6 +614,10 @@ export function LessonFormModal({
     if (!hwText.trim() || !onAssignHomework) return;
     onAssignHomework(hwText.trim());
     setHwText("");
+  }
+
+  function useNoteHomework() {
+    if (noteHomeworkText) setHwText(noteHomeworkText);
   }
 
   function startEditingHw() {
@@ -681,8 +693,25 @@ export function LessonFormModal({
         )}
 
         {isPast && (
-          <div className="grid sm:grid-cols-2 gap-5">
-            <Field label="Комментарий об уроке">
+          <>
+            <Field label="Урок из методики">
+              <select
+                value={noteId}
+                onChange={(e) => setNoteId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
+              >
+                <option value="">Не указано</option>
+                {notes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.grade ? `${n.grade} · ` : ""}
+                    {n.topic}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <div className="grid sm:grid-cols-2 gap-5">
+              <Field label="Комментарий об уроке">
               <TextArea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
@@ -729,6 +758,17 @@ export function LessonFormModal({
                   )
                 ) : (
                   <div className="space-y-2">
+                    {noteHomeworkText && (
+                      <button
+                        type="button"
+                        onClick={useNoteHomework}
+                        className="w-full text-left rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-2.5 text-sm text-[#2563EB] hover:bg-blue-100 transition"
+                      >
+                        <div className="font-medium text-xs uppercase tracking-wide mb-0.5">Д/З из методики «{selectedNote!.topic}»</div>
+                        <div className="text-gray-700 line-clamp-2">{noteHomeworkText}</div>
+                        <div className="text-[11px] text-[#2563EB] mt-1">Нажмите, чтобы использовать — текст можно будет изменить</div>
+                      </button>
+                    )}
                     <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={5} placeholder="Что задать на дом..." />
                     <GhostButton icon={BookOpen} onClick={assignHomework} disabled={!hwText.trim()}>
                       Задать домашнее задание
@@ -740,7 +780,8 @@ export function LessonFormModal({
                 )}
               </div>
             )}
-          </div>
+            </div>
+          </>
         )}
 
         {!isEdit && (

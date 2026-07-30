@@ -14,7 +14,7 @@ import {
   type RecurrenceEnd,
   type RecurrenceFreq,
 } from "../lib/utils";
-import type { Group, Homework, Lesson, MessagesByStudent, Student, WeeklyTemplateSlot } from "../lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, WeeklyTemplateSlot } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { LessonFormModal } from "./StudentDetailView";
@@ -36,6 +36,7 @@ interface Props {
   setHomework: (h: Homework[]) => void;
   messages: MessagesByStudent;
   setMessages: (m: MessagesByStudent) => void;
+  notes: MethodNote[];
   showToast: (t: string) => void;
 }
 
@@ -51,6 +52,7 @@ export function ScheduleView({
   setHomework,
   messages,
   setMessages,
+  notes,
   showToast,
 }: Props) {
   const [mode, setMode] = useState<"month" | "week">("month");
@@ -351,6 +353,7 @@ export function ScheduleView({
           defaultDuration={editLesson.duration}
           lesson={editLesson}
           homework={homework}
+          notes={notes}
           onAssignHomework={handleAssignHomework}
           onUpdateHomework={handleUpdateHomework}
           onClose={() => setEditLesson(null)}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
+import { AlertTriangle, BookOpen, Calendar, Check, Layers, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
@@ -34,6 +34,11 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [editingHw, setEditingHw] = useState<Homework | null>(null);
+  const [presetLesson, setPresetLesson] = useState<Lesson | null>(null);
+
+  const missingHwLessons = lessons
+    .filter((l) => l.studentId && l.status !== "cancelled" && l.date <= TODAY_KEY && !homework.some((h) => h.lessonId === l.id))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   function updateHomework(id: string, patch: Partial<Homework>) {
     setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
@@ -94,6 +99,31 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
           </div>
         }
       />
+
+      {missingHwLessons.length > 0 && (
+        <Card className="mb-4 divide-y divide-amber-100 border-amber-200 bg-amber-50/40">
+          <div className="px-4 sm:px-5 py-3 flex items-center gap-2 text-amber-700 text-sm font-semibold">
+            <AlertTriangle size={16} /> Д/З не назначено после занятия
+          </div>
+          {missingHwLessons.map((l) => {
+            const st = students.find((s) => s.id === l.studentId);
+            return (
+              <div
+                key={l.id}
+                onClick={() => setPresetLesson(l)}
+                className="flex items-center gap-3 px-4 sm:px-5 py-3 cursor-pointer hover:bg-amber-50 transition"
+              >
+                {st ? <Avatar id={st.id} name={st.name} size={34} /> : <div className="w-[34px]" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{st?.name || l.title}</div>
+                  <div className="text-xs text-gray-500">Урок {fmtDateRu(l.date)}</div>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 shrink-0">Задать ДЗ</span>
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       {homework.length === 0 ? (
         <EmptyState
@@ -173,6 +203,19 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
       )}
 
       {showAdd && <AddHomeworkModal students={students} lessons={lessons} notes={notes} onClose={() => setShowAdd(false)} onSave={addHomework} />}
+      {presetLesson && (
+        <AddHomeworkModal
+          students={students}
+          lessons={lessons}
+          notes={notes}
+          presetLesson={presetLesson}
+          onClose={() => setPresetLesson(null)}
+          onSave={(data) => {
+            addHomework(data);
+            setPresetLesson(null);
+          }}
+        />
+      )}
       {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={updateHomework} />}
     </div>
   );
@@ -249,12 +292,14 @@ function AddHomeworkModal({
   students,
   lessons,
   notes,
+  presetLesson,
   onClose,
   onSave,
 }: {
   students: Student[];
   lessons: Lesson[];
   notes: MethodNote[];
+  presetLesson?: Lesson | null;
   onClose: () => void;
   onSave: (data: {
     studentId: string;
@@ -266,16 +311,19 @@ function AddHomeworkModal({
     attachments: Attachment[];
   }) => void;
 }) {
-  const [studentId, setStudentId] = useState(students[0]?.id || "");
+  const [studentId, setStudentId] = useState(presetLesson?.studentId || students[0]?.id || "");
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
-  const [noteId, setNoteId] = useState("");
-  const [lessonId, setLessonId] = useState("");
+  const [noteId, setNoteId] = useState(presetLesson?.noteId || "");
+  const [lessonId, setLessonId] = useState(presetLesson?.id || "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const studentLessons = lessons
     .filter((l) => l.studentId === studentId && l.status !== "cancelled")
     .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
+
+  const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
+  const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -312,7 +360,25 @@ function AddHomeworkModal({
           </select>
         </Field>
         <Field label="Задание">
-          <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Решить №12-18, стр. 34" />
+          {noteHomeworkText && (
+            <button
+              type="button"
+              onClick={() => setTitle(noteHomeworkText)}
+              className="w-full text-left rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-2.5 text-sm text-[#2563EB] hover:bg-blue-100 transition mb-2"
+            >
+              <div className="font-medium text-xs uppercase tracking-wide mb-0.5">Д/З из методики «{selectedNote!.topic}»</div>
+              <div className="text-gray-700 line-clamp-2">{noteHomeworkText}</div>
+              <div className="text-[11px] text-[#2563EB] mt-1">Нажмите, чтобы использовать — текст можно будет изменить</div>
+            </button>
+          )}
+          <textarea
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            rows={4}
+            placeholder="Например, Решить №12-18, стр. 34"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] resize-none"
+          />
         </Field>
         <Field label="Срок сдачи">
           <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
