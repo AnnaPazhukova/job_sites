@@ -33,6 +33,7 @@ import {
   type RecurrenceFreq,
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
+import { HomeworkEditModal } from "./HomeworkView";
 import type { Homework, HomeworkStatus, Lesson, MessagesByStudent, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -78,6 +79,7 @@ export function StudentDetailPage({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPackagePicker, setShowPackagePicker] = useState(false);
+  const [editingHw, setEditingHw] = useState<Homework | null>(null);
 
   useEffect(() => {
     if (!studentPortalEnabled || !selectedStudentId) return;
@@ -195,6 +197,12 @@ export function StudentDetailPage({
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
     showToast("Домашнее задание задано");
+  }
+
+  function handleUpdateHomework(id: string, patch: Partial<Homework>) {
+    setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    setEditingHw(null);
+    showToast("Домашнее задание обновлено");
   }
 
   return (
@@ -473,10 +481,14 @@ export function StudentDetailPage({
           <div className="font-semibold text-lg mb-3">Домашние задания</div>
           <Card className="divide-y divide-[#F0F1F4]">
             {studentHomework.map((h) => (
-              <div key={h.id} className="flex items-center justify-between px-4 sm:px-5 py-3">
+              <div
+                key={h.id}
+                onClick={() => setEditingHw(h)}
+                className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 cursor-pointer hover:bg-gray-50 transition"
+              >
                 <span className="text-sm">{h.title}</span>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${h.status === "done" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                  {h.status === "done" ? "Проверено" : "На проверке"}
+                <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[normalizeHomeworkStatus(h.status)].color}`}>
+                  {HW_STATUS_META[normalizeHomeworkStatus(h.status)].label}
                 </span>
               </div>
             ))}
@@ -492,6 +504,7 @@ export function StudentDetailPage({
           lesson={editLesson}
           homework={homework}
           onAssignHomework={handleAssignHomework}
+          onUpdateHomework={handleUpdateHomework}
           onClose={() => {
             setShowLessonForm(false);
             setEditLesson(null);
@@ -500,6 +513,8 @@ export function StudentDetailPage({
           onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
         />
       )}
+
+      {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
     </div>
   );
 }
@@ -530,6 +545,7 @@ interface LessonFormProps {
   lesson: Lesson | null;
   homework?: Homework[];
   onAssignHomework?: (title: string) => void;
+  onUpdateHomework?: (id: string, patch: Partial<Homework>) => void;
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
   onCancelLesson: (() => void) | null;
@@ -542,6 +558,7 @@ export function LessonFormModal({
   lesson,
   homework = [],
   onAssignHomework,
+  onUpdateHomework,
   onClose,
   onSave,
   onCancelLesson,
@@ -554,6 +571,9 @@ export function LessonFormModal({
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
   const [comment, setComment] = useState(lesson?.comment || "");
   const [hwText, setHwText] = useState("");
+  const [editingHw, setEditingHw] = useState(false);
+  const [hwEditText, setHwEditText] = useState("");
+  const [hwEditDue, setHwEditDue] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
   const [days, setDays] = useState<number[]>([]);
@@ -586,6 +606,19 @@ export function LessonFormModal({
     if (!hwText.trim() || !onAssignHomework) return;
     onAssignHomework(hwText.trim());
     setHwText("");
+  }
+
+  function startEditingHw() {
+    if (!linkedHomework) return;
+    setHwEditText(linkedHomework.title);
+    setHwEditDue(linkedHomework.due || "");
+    setEditingHw(true);
+  }
+
+  function saveHwEdit() {
+    if (!linkedHomework || !onUpdateHomework || !hwEditText.trim()) return;
+    onUpdateHomework(linkedHomework.id, { title: hwEditText.trim(), due: hwEditDue || null });
+    setEditingHw(false);
   }
 
   return (
@@ -662,17 +695,38 @@ export function LessonFormModal({
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1.5">Домашнее задание</div>
                 {linkedHomework ? (
-                  <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm flex items-center gap-1.5">
-                        <BookOpen size={14} className="text-gray-400 shrink-0" /> {linkedHomework.title}
-                      </span>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].color}`}>
-                        {HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].label}
-                      </span>
+                  editingHw ? (
+                    <div className="space-y-2">
+                      <TextArea value={hwEditText} onChange={(e) => setHwEditText(e.target.value)} rows={4} />
+                      <Field label="Срок сдачи">
+                        <TextInput type="date" value={hwEditDue} onChange={(e) => setHwEditDue(e.target.value)} />
+                      </Field>
+                      <div className="flex gap-2">
+                        <GhostButton full onClick={() => setEditingHw(false)}>
+                          Отмена
+                        </GhostButton>
+                        <PrimaryButton full onClick={saveHwEdit}>
+                          Сохранить
+                        </PrimaryButton>
+                      </div>
                     </div>
-                    {linkedHomework.due && <div className="text-xs text-gray-400 mt-1">Срок: {fmtDateRu(linkedHomework.due)}</div>}
-                  </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={startEditingHw}
+                      className="w-full text-left rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 hover:border-gray-300 transition"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm flex items-center gap-1.5">
+                          <BookOpen size={14} className="text-gray-400 shrink-0" /> {linkedHomework.title}
+                        </span>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0 ${HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].color}`}>
+                          {HW_STATUS_META[normalizeHomeworkStatus(linkedHomework.status)].label}
+                        </span>
+                      </div>
+                      {linkedHomework.due && <div className="text-xs text-gray-400 mt-1">Срок: {fmtDateRu(linkedHomework.due)}</div>}
+                    </button>
+                  )
                 ) : (
                   <div className="space-y-2">
                     <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={5} placeholder="Что задать на дом..." />

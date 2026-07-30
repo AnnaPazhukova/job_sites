@@ -157,6 +157,11 @@ export function ScheduleView({
     showToast("Домашнее задание задано");
   }
 
+  function handleUpdateHomework(id: string, patch: Partial<Homework>) {
+    setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    showToast("Домашнее задание обновлено");
+  }
+
   function goPrev() {
     setCursor(mode === "month" ? new Date(year, month - 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
   }
@@ -347,6 +352,7 @@ export function ScheduleView({
           lesson={editLesson}
           homework={homework}
           onAssignHomework={handleAssignHomework}
+          onUpdateHomework={handleUpdateHomework}
           onClose={() => setEditLesson(null)}
           onSave={saveLessonEdit}
           onCancelLesson={() => cancelLessonEdit(editLesson.id)}

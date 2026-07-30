@@ -33,6 +33,13 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingHw, setEditingHw] = useState<Homework | null>(null);
+
+  function updateHomework(id: string, patch: Partial<Homework>) {
+    setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    setEditingHw(null);
+    showToast("Домашнее задание обновлено");
+  }
 
   const filtered = homework.filter((h) => {
     const matchQ = h.title.toLowerCase().includes(query.toLowerCase()) || h.studentName.toLowerCase().includes(query.toLowerCase());
@@ -109,7 +116,11 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
             const linkedNote = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
             const linkedLesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
             return (
-              <div key={h.id} className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap">
+              <div
+                key={h.id}
+                onClick={() => setEditingHw(h)}
+                className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap cursor-pointer hover:bg-gray-50 transition"
+              >
                 {st ? <Avatar id={st.id} name={st.name} size={38} /> : <div className="w-[38px]" />}
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{h.title}</div>
@@ -120,7 +131,10 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {linkedNote && (
                         <button
-                          onClick={() => onOpenNote(linkedNote.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenNote(linkedNote.id);
+                          }}
                           className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB] hover:bg-blue-100 transition"
                         >
                           <Layers size={11} /> {linkedNote.topic}
@@ -141,7 +155,13 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                 </div>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
                 {h.status !== "done" && (
-                  <button onClick={() => markDone(h.id)} className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markDone(h.id);
+                    }}
+                    className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 shrink-0"
+                  >
                     <Check size={16} />
                   </button>
                 )}
@@ -153,7 +173,75 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
       )}
 
       {showAdd && <AddHomeworkModal students={students} lessons={lessons} notes={notes} onClose={() => setShowAdd(false)} onSave={addHomework} />}
+      {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={updateHomework} />}
     </div>
+  );
+}
+
+const HW_STATUS_OPTIONS: { value: HomeworkStatus; label: string }[] = [
+  { value: "assigned", label: "Не сдано" },
+  { value: "submitted", label: "На проверке" },
+  { value: "done", label: "Проверено" },
+];
+
+export function HomeworkEditModal({
+  homework,
+  onClose,
+  onSave,
+}: {
+  homework: Homework;
+  onClose: () => void;
+  onSave: (id: string, patch: Partial<Homework>) => void;
+}) {
+  const [title, setTitle] = useState(homework.title);
+  const [due, setDue] = useState(homework.due || "");
+  const [status, setStatus] = useState<HomeworkStatus>(normalizeHomeworkStatus(homework.status));
+  const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments });
+  }
+
+  return (
+    <Modal title="Домашнее задание" onClose={onClose} wide>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="text-sm text-gray-500">{homework.studentName}</div>
+        <Field label="Задание">
+          <textarea
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            rows={4}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] resize-none"
+          />
+        </Field>
+        <Field label="Срок сдачи">
+          <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </Field>
+        <Field label="Статус">
+          <div className="grid grid-cols-3 gap-2">
+            {HW_STATUS_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setStatus(o.value)}
+                className={`py-2 rounded-xl text-sm font-medium border transition ${
+                  status === o.value ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <AttachmentsField attachments={attachments} onChange={setAttachments} />
+        <PrimaryButton type="submit" full>
+          Сохранить
+        </PrimaryButton>
+      </form>
+    </Modal>
   );
 }
 
