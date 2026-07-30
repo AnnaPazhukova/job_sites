@@ -181,6 +181,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   setHomework={setHomework}
                   messages={messages}
                   setMessages={setMessages}
+                  notes={notes}
                   selectedStudentId={selectedStudentId}
                   setView={setView}
                   showToast={showToast}
@@ -200,6 +201,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   setHomework={setHomework}
                   messages={messages}
                   setMessages={setMessages}
+                  notes={notes}
                   showToast={showToast}
                 />
               )}

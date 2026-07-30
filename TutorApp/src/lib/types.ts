@@ -45,6 +45,8 @@ export interface Lesson {
   status: LessonStatus;
   paymentStatus: PaymentStatus;
   comment?: string;
+  /** Methodology topic covered in this lesson (see MethodNote). */
+  noteId?: string;
 }
 
 // assigned: given to the student, not yet turned in.

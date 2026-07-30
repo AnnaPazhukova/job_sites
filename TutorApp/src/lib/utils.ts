@@ -112,6 +112,7 @@ export function buildHomeworkAssignment(
     due,
     status: "assigned",
     lessonId: lesson.id,
+    noteId: lesson.noteId,
   };
   const message: ChatMessage = {
     id: uid(),
