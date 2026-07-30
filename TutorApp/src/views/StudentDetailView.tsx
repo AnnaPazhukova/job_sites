@@ -192,10 +192,10 @@ export function StudentDetailPage({
     setEditLesson(null);
   }
 
-  function handleAssignHomework(title: string) {
+  function handleAssignHomework(title: string, noteId?: string) {
     if (!editLesson || !editLesson.studentId) return;
     const st = students.find((s) => s.id === editLesson.studentId);
-    const { homework: hw, message } = buildHomeworkAssignment(editLesson, st?.name || editLesson.title, title, lessons);
+    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons);
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
     showToast("Домашнее задание задано");
@@ -548,7 +548,7 @@ interface LessonFormProps {
   lesson: Lesson | null;
   homework?: Homework[];
   notes?: MethodNote[];
-  onAssignHomework?: (title: string) => void;
+  onAssignHomework?: (title: string, noteId?: string) => void;
   onUpdateHomework?: (id: string, patch: Partial<Homework>) => void;
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
@@ -612,7 +612,10 @@ export function LessonFormModal({
 
   function assignHomework() {
     if (!hwText.trim() || !onAssignHomework) return;
-    onAssignHomework(hwText.trim());
+    if (isEdit && noteId !== (lesson?.noteId || "")) {
+      onSave({ id: lesson!.id, noteId: noteId || undefined });
+    }
+    onAssignHomework(hwText.trim(), noteId || undefined);
     setHwText("");
   }
 

@@ -150,10 +150,10 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
-  function handleAssignHomework(title: string) {
+  function handleAssignHomework(title: string, noteId?: string) {
     if (!editLesson || !editLesson.studentId) return;
     const st = students.find((s) => s.id === editLesson.studentId);
-    const { homework: hw, message } = buildHomeworkAssignment(editLesson, st?.name || editLesson.title, title, lessons);
+    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons);
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
     showToast("Домашнее задание задано");
