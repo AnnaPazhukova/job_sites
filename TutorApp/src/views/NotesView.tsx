@@ -11,6 +11,7 @@ const subjectsForGrade = (grade: string) => {
   return ["Алгебра", "Геометрия"];
 };
 const ALL_SUBJECTS = ["Математика", "Алгебра", "Геометрия", "Подготовка к ОГЭ"];
+const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
 const OGE_PREP_TEMPLATE = `Работа с текстом задания: чтение условия, планы участков, схемы
 Вычисления по условию текста (задания 1–5), единицы измерения
@@ -133,10 +134,17 @@ function getTabs(note: MethodNote | null): MethodNoteTabs {
   return { ...EMPTY_TABS, theory: note.content || "" };
 }
 
+function isNoteEmpty(note: MethodNote): boolean {
+  const tabs = getTabs(note);
+  const hasText = TAB_ORDER.some((k) => tabs[k]?.trim());
+  const hasAttachments = TAB_ORDER.some((k) => (note.attachments?.[k]?.length ?? 0) > 0);
+  return !hasText && !hasAttachments;
+}
+
 const emptyNote = (): MethodNote => ({
   id: uid(),
   topic: "",
-  grade: GRADES[1],
+  grade: NOTE_GRADES[1],
   subject: "Математика",
   tabs: { ...EMPTY_TABS },
   updatedAt: Date.now(),
@@ -180,8 +188,9 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
+  const emptyCount = useMemo(() => notes.filter(isNoteEmpty).length, [notes]);
 
-  const [newGrade, setNewGrade] = useState(GRADES[1]);
+  const [newGrade, setNewGrade] = useState(NOTE_GRADES[1]);
   const [newSubject, setNewSubject] = useState("Математика");
 
   const handleCreate = () => {
@@ -231,11 +240,17 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
             <TextInput placeholder="Поиск по теме..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
           </div>
           <div className="w-40">
-            <Select value={gradeFilter} onChange={setGradeFilter} options={["Все классы", ...GRADES]} />
+            <Select value={gradeFilter} onChange={setGradeFilter} options={["Все классы", ...NOTE_GRADES]} />
           </div>
           <div className="w-44">
             <Select value={subjectFilter} onChange={setSubjectFilter} options={["Все предметы", ...ALL_SUBJECTS]} />
           </div>
+          {emptyCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Не заполнено тем: {emptyCount}
+            </span>
+          )}
         </div>
       </Card>
 
@@ -266,7 +281,7 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                     setNewGrade(v);
                     if (!opts.includes(newSubject)) setNewSubject(opts[0]);
                   }}
-                  options={GRADES}
+                  options={NOTE_GRADES}
                 />
                 <Select value={newSubject} onChange={setNewSubject} options={subjectsForGrade(newGrade)} />
               </div>
@@ -282,18 +297,32 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           )}
 
           <div className="mt-2 space-y-1 max-h-[60vh] overflow-y-auto pr-1">
-            {GRADES.filter((g) => filteredNotes.some((n) => n.grade === g)).map((g) => (
+            {NOTE_GRADES.filter((g) => filteredNotes.some((n) => n.grade === g)).map((g) => (
               <div key={g}>
                 <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold px-2 pt-3 pb-1">{g}</div>
                 {filteredNotes
                   .filter((n) => n.grade === g)
                   .map((n) => (
-                    <NoteRow key={n.id} note={n} active={n.id === activeId} onClick={() => setActiveId(n.id)} onDelete={() => handleDelete(n.id)} />
+                    <NoteRow
+                      key={n.id}
+                      note={n}
+                      active={n.id === activeId}
+                      empty={isNoteEmpty(n)}
+                      onClick={() => setActiveId(n.id)}
+                      onDelete={() => handleDelete(n.id)}
+                    />
                   ))}
               </div>
             ))}
-            {filteredNotes.filter((n) => !GRADES.includes(n.grade)).map((n) => (
-              <NoteRow key={n.id} note={n} active={n.id === activeId} onClick={() => setActiveId(n.id)} onDelete={() => handleDelete(n.id)} />
+            {filteredNotes.filter((n) => !NOTE_GRADES.includes(n.grade)).map((n) => (
+              <NoteRow
+                key={n.id}
+                note={n}
+                active={n.id === activeId}
+                empty={isNoteEmpty(n)}
+                onClick={() => setActiveId(n.id)}
+                onDelete={() => handleDelete(n.id)}
+              />
             ))}
             {filteredNotes.length === 0 && !creating && (
               <p className="text-xs text-gray-400 px-2 py-4">
@@ -311,6 +340,11 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                   <h3 className="font-bold text-lg">{active.topic}</h3>
                   {active.grade && <Pill tone="level">{active.grade}</Pill>}
                   {active.subject && <Pill>{active.subject}</Pill>}
+                  {isNoteEmpty(active) && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold uppercase tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Не заполнено
+                    </span>
+                  )}
                 </div>
                 {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
               </div>
@@ -396,7 +430,7 @@ function BulkAddModal({
               setSubject(nextSubject);
               setText(BULK_TEMPLATES[`${v}|${nextSubject}`] || "");
             }}
-            options={GRADES}
+            options={NOTE_GRADES}
           />
           <Select
             value={subject}
@@ -425,7 +459,19 @@ function BulkAddModal({
   );
 }
 
-function NoteRow({ note, active, onClick, onDelete }: { note: MethodNote; active: boolean; onClick: () => void; onDelete: () => void }) {
+function NoteRow({
+  note,
+  active,
+  empty,
+  onClick,
+  onDelete,
+}: {
+  note: MethodNote;
+  active: boolean;
+  empty: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
   return (
     <div
       onClick={onClick}
@@ -433,7 +479,10 @@ function NoteRow({ note, active, onClick, onDelete }: { note: MethodNote; active
         active ? "bg-[#EEF2FF] text-[#2563EB] font-medium" : "text-gray-600 hover:bg-gray-50"
       }`}
     >
-      <span className="truncate">{note.topic}</span>
+      <span className="flex items-center gap-1.5 min-w-0">
+        {empty && <span title="Тема ещё не заполнена" className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+        <span className="truncate">{note.topic}</span>
+      </span>
       <Trash2
         size={13}
         className="opacity-0 group-hover:opacity-60 hover:!opacity-100 shrink-0 ml-2"
