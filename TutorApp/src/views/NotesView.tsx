@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Layers, ListPlus, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, GripVertical, Layers, ListPlus, Plus, Search, Trash2, X } from "lucide-react";
 import { Card, GhostButton, Modal, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
@@ -213,6 +213,29 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     if (activeId === id) setActiveId(next[0]?.id ?? null);
   };
 
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [overPos, setOverPos] = useState<"before" | "after" | null>(null);
+
+  const moveNote = (draggedId: string, targetId: string, after: boolean) => {
+    if (draggedId === targetId) return;
+    const list = [...notes];
+    const fromIndex = list.findIndex((n) => n.id === draggedId);
+    const targetNote = list.find((n) => n.id === targetId);
+    if (fromIndex === -1 || !targetNote || list[fromIndex].grade !== targetNote.grade) return;
+    const [item] = list.splice(fromIndex, 1);
+    let toIndex = list.findIndex((n) => n.id === targetId);
+    toIndex = after ? toIndex + 1 : toIndex;
+    list.splice(toIndex, 0, item);
+    saveNotes(list);
+  };
+
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+    setOverPos(null);
+  };
+
   const handleBulkAdd = (grade: string, subject: string, lines: string[]) => {
     const newNotes = lines.map((topic) => ({ ...emptyNote(), topic, grade, subject }));
     if (newNotes.length === 0) return;
@@ -293,8 +316,20 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                       key={n.id}
                       note={n}
                       active={n.id === activeId}
+                      dragging={dragId === n.id}
+                      dropIndicator={overId === n.id ? overPos : null}
                       onClick={() => setActiveId(n.id)}
                       onDelete={() => handleDelete(n.id)}
+                      onDragStart={() => setDragId(n.id)}
+                      onDragEndRow={endDrag}
+                      onDragOverRow={(pos) => {
+                        setOverId(n.id);
+                        setOverPos(pos);
+                      }}
+                      onDropRow={() => {
+                        if (dragId) moveNote(dragId, n.id, overPos === "after");
+                        endDrag();
+                      }}
                     />
                   ))}
               </div>
@@ -304,8 +339,20 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                 key={n.id}
                 note={n}
                 active={n.id === activeId}
+                dragging={dragId === n.id}
+                dropIndicator={overId === n.id ? overPos : null}
                 onClick={() => setActiveId(n.id)}
                 onDelete={() => handleDelete(n.id)}
+                onDragStart={() => setDragId(n.id)}
+                onDragEndRow={endDrag}
+                onDragOverRow={(pos) => {
+                  setOverId(n.id);
+                  setOverPos(pos);
+                }}
+                onDropRow={() => {
+                  if (dragId) moveNote(dragId, n.id, overPos === "after");
+                  endDrag();
+                }}
               />
             ))}
             {filteredNotes.length === 0 && !creating && (
@@ -449,18 +496,55 @@ function BulkAddModal({
   );
 }
 
-function NoteRow({ note, active, onClick, onDelete }: { note: MethodNote; active: boolean; onClick: () => void; onDelete: () => void }) {
+function NoteRow({
+  note,
+  active,
+  dragging,
+  dropIndicator,
+  onClick,
+  onDelete,
+  onDragStart,
+  onDragEndRow,
+  onDragOverRow,
+  onDropRow,
+}: {
+  note: MethodNote;
+  active: boolean;
+  dragging: boolean;
+  dropIndicator: "before" | "after" | null;
+  onClick: () => void;
+  onDelete: () => void;
+  onDragStart: () => void;
+  onDragEndRow: () => void;
+  onDragOverRow: (pos: "before" | "after") => void;
+  onDropRow: () => void;
+}) {
   return (
     <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEndRow}
+      onDragOver={(e) => {
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onDragOverRow(e.clientY - rect.top > rect.height / 2 ? "after" : "before");
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropRow();
+      }}
       onClick={onClick}
-      className={`group flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer text-sm transition-colors ${
+      className={`group flex items-center gap-1 px-1.5 py-2 rounded-lg cursor-pointer text-sm transition-colors border-t-2 border-b-2 ${
         active ? "bg-[#EEF2FF] text-[#2563EB] font-medium" : "text-gray-600 hover:bg-gray-50"
+      } ${dragging ? "opacity-40" : ""} ${dropIndicator === "before" ? "border-t-[#2563EB]" : "border-t-transparent"} ${
+        dropIndicator === "after" ? "border-b-[#2563EB]" : "border-b-transparent"
       }`}
     >
-      <span className="truncate">{note.topic}</span>
+      <GripVertical size={12} className="text-gray-300 shrink-0 cursor-grab" />
+      <span className="truncate flex-1">{note.topic}</span>
       <Trash2
         size={13}
-        className="text-gray-300 hover:text-red-500 shrink-0 ml-2"
+        className="text-gray-300 hover:text-red-500 shrink-0 ml-1"
         onClick={(e) => {
           e.stopPropagation();
           if (window.confirm(`Удалить тему «${note.topic}»?`)) onDelete();
