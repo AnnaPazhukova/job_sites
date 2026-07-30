@@ -72,6 +72,8 @@ export interface Homework {
   noteId?: string;
   lessonId?: string;
   attachments?: Attachment[];
+  /** Tutor's feedback on the reviewed work — visible to the student too. */
+  reviewComment?: string;
 }
 
 export interface ChatMessage {

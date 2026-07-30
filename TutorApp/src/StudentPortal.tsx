@@ -259,6 +259,12 @@ export default function StudentPortal({ code, onExit }: Props) {
                               ))}
                             </div>
                           )}
+                          {h.reviewComment && (
+                            <div className="mt-2.5 px-3 py-2 rounded-lg bg-blue-50 text-sm text-gray-700">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-0.5">Комментарий преподавателя</div>
+                              {h.reviewComment}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
