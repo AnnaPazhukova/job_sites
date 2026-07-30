@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
-import { Avatar, Card, EmptyState, PageHeader } from "./components/ui";
+import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
+import { AttachmentList } from "./components/Attachments";
 import { AttachmentsField } from "./components/Attachments";
 import { fmtDateRu, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
@@ -39,6 +40,7 @@ export default function StudentPortal({ code, onExit }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<"invalid" | "setup" | null>(null);
+  const [openHw, setOpenHw] = useState<Homework | null>(null);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -94,6 +96,7 @@ export default function StudentPortal({ code, onExit }: Props) {
 
   async function submitHomework(id: string) {
     setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "submitted" } : h)));
+    setOpenHw((h) => (h && h.id === id ? { ...h, status: "submitted" } : h));
     try {
       await markStudentHomeworkDone(code, id);
       showToast("Отправлено репетитору на проверку");
@@ -213,7 +216,7 @@ export default function StudentPortal({ code, onExit }: Props) {
                       const note = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
                       const lesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
                       return (
-                        <div key={h.id} className="px-4 sm:px-5 py-4">
+                        <div key={h.id} onClick={() => setOpenHw(h)} className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="min-w-0">
                               <div className="font-medium text-sm">{h.title}</div>
@@ -230,7 +233,10 @@ export default function StudentPortal({ code, onExit }: Props) {
                               </span>
                               {normalizeHomeworkStatus(h.status) === "assigned" && (
                                 <button
-                                  onClick={() => submitHomework(h.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    submitHomework(h.id);
+                                  }}
                                   className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition"
                                 >
                                   <Check size={13} /> Сдать
@@ -281,6 +287,16 @@ export default function StudentPortal({ code, onExit }: Props) {
         )}
       </main>
 
+      {openHw && (
+        <HomeworkDetailModal
+          homework={openHw}
+          lesson={openHw.lessonId ? lessons.find((l) => l.id === openHw.lessonId) : undefined}
+          note={openHw.noteId ? notes.find((n) => n.id === openHw.noteId) : undefined}
+          onSubmit={submitHomework}
+          onClose={() => setOpenHw(null)}
+        />
+      )}
+
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-[#111827] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
           <CheckCircle2 size={16} className="text-emerald-400" />
@@ -288,6 +304,82 @@ export default function StudentPortal({ code, onExit }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function HomeworkDetailModal({
+  homework,
+  lesson,
+  note,
+  onSubmit,
+  onClose,
+}: {
+  homework: Homework;
+  lesson?: Lesson;
+  note?: MethodNote;
+  onSubmit: (id: string) => void;
+  onClose: () => void;
+}) {
+  const status = normalizeHomeworkStatus(homework.status);
+  const theory = note?.tabs?.theory?.trim();
+  const theoryAttachments = note?.attachments?.theory ?? [];
+
+  return (
+    <Modal title={homework.title} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
+          <span className="text-xs text-gray-500">{homework.due ? `срок до ${fmtDateRu(homework.due)}` : "без срока"}</span>
+          {homework.grade != null && (
+            <span className="w-7 h-7 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">{homework.grade}</span>
+          )}
+        </div>
+
+        {homework.attachments && homework.attachments.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Файлы задания</div>
+            <AttachmentList attachments={homework.attachments} />
+          </div>
+        )}
+
+        {lesson?.comment && (
+          <div className="px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Об уроке</div>
+            <div className="text-sm text-gray-700 whitespace-pre-wrap">{lesson.comment}</div>
+          </div>
+        )}
+
+        {(theory || theoryAttachments.length > 0) && (
+          <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1 flex items-center gap-1">
+              <Layers size={12} /> Теория{note ? ` · ${note.topic}` : ""}
+            </div>
+            {theory && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{theory}</div>}
+            {theoryAttachments.length > 0 && <AttachmentList attachments={theoryAttachments} />}
+          </div>
+        )}
+
+        {homework.reviewComment && (
+          <div className="px-3.5 py-3 rounded-xl bg-blue-50">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-1">Комментарий преподавателя</div>
+            <div className="text-sm text-gray-700 whitespace-pre-wrap">{homework.reviewComment}</div>
+          </div>
+        )}
+
+        {status === "assigned" && (
+          <PrimaryButton
+            full
+            icon={Check}
+            onClick={() => {
+              onSubmit(homework.id);
+              onClose();
+            }}
+          >
+            Сдать
+          </PrimaryButton>
+        )}
+      </div>
+    </Modal>
   );
 }
 

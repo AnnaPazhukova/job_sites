@@ -10,6 +10,33 @@ interface Props {
   folder?: string;
 }
 
+export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {attachments.map((a) =>
+        a.mimeType?.startsWith("image/") ? (
+          <a key={a.id} href={a.url} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition">
+            <img src={a.url} alt={a.name} className="h-24 w-24 object-cover" />
+          </a>
+        ) : (
+          <a
+            key={a.id}
+            href={a.url}
+            target="_blank"
+            rel="noreferrer"
+            download={a.name}
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition"
+          >
+            <Paperclip size={12} className="shrink-0" />
+            <span className="truncate">{a.name}</span>
+          </a>
+        )
+      )}
+    </div>
+  );
+}
+
 export function AttachmentsField({ attachments, onChange, label = "Файлы", folder }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
