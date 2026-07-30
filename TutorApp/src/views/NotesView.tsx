@@ -1,12 +1,57 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Layers, Plus, Search, Trash2, X } from "lucide-react";
-import { Card, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
+import { Check, Layers, ListPlus, Plus, Search, Trash2, X } from "lucide-react";
+import { Card, GhostButton, Modal, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
 import type { Attachment, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
 
-const subjectsForGrade = (grade: string) => (grade === "5 класс" || grade === "6 класс" ? ["Математика"] : ["Алгебра", "Геометрия"]);
-const ALL_SUBJECTS = ["Математика", "Алгебра", "Геометрия"];
+const subjectsForGrade = (grade: string) => {
+  if (grade === "5 класс" || grade === "6 класс") return ["Математика"];
+  if (grade === "9 класс") return ["Алгебра", "Геометрия", "Подготовка к ОГЭ"];
+  return ["Алгебра", "Геометрия"];
+};
+const ALL_SUBJECTS = ["Математика", "Алгебра", "Геометрия", "Подготовка к ОГЭ"];
+
+const OGE_PREP_TEMPLATE = `Работа с текстом задания: чтение условия, планы участков, схемы
+Вычисления по условию текста (задания 1–5), единицы измерения
+Задание 6 — числа и вычисления: действия с обыкновенными и десятичными дробями
+Задание 6 — числа и вычисления: степени, стандартный вид числа, проценты
+Задание 7 — числовые неравенства, координатная прямая: сравнение чисел, отметка на координатной прямой, свойства неравенств
+Задание 8 — алгебраические выражения: формулы сокращённого умножения
+Задание 8 — алгебраические выражения: преобразование выражений и дробей
+Задание 9 — уравнения и системы: линейные уравнения и системы
+Задание 9 — уравнения и системы: квадратные уравнения
+Задание 9 — уравнения и системы: дробно-рациональные уравнения
+Задание 10 — статистика и вероятности: классическая вероятность
+Задание 10 — статистика и вероятности: комбинаторика, круги Эйлера
+Задание 11 — графики функций: линейная функция и её график
+Задание 11 — графики функций: квадратичная функция, парабола
+Задание 11 — графики функций: обратная пропорциональность (гипербола)
+Задание 12 — расчёты по формулам: прикладные формулы (тарифы, физические величины)
+Задание 13 — неравенства и системы: линейные неравенства
+Задание 13 — неравенства и системы: квадратные неравенства, метод интервалов
+Задание 13 — неравенства и системы: системы неравенств
+Задание 14 — прогрессии: арифметическая прогрессия
+Задание 14 — прогрессии: геометрическая прогрессия
+Задание 15 — треугольники и многоугольники: признаки равенства, свойства треугольников
+Задание 15 — треугольники и многоугольники: теорема Пифагора, тригонометрия прямоугольного треугольника
+Задание 15 — треугольники и многоугольники: подобие треугольников
+Задание 15 — треугольники и многоугольники: параллелограмм, трапеция и их свойства
+Задание 16 — окружность и круг: хорды, касательные, центральные и вписанные углы
+Задание 16 — окружность и круг: вписанная и описанная окружности
+Задание 17 — площади фигур: площади треугольников и четырёхугольников
+Задание 17 — площади фигур: площади фигур сложной формы, круга и его частей
+Задание 18 — фигуры на решётке: площади и длины на клетчатой бумаге
+Задание 18 — фигуры на решётке: углы, построение и измерение фигур
+Задание 19 — анализ геометрических утверждений: разбор верных/неверных утверждений
+Задание 20: сложные уравнения и неравенства повышенного уровня
+Задание 21: текстовые задачи (движение, работа, смеси)
+Задание 22: функции и их свойства, построение и анализ графиков
+Задание 23: геометрическая задача на вычисление
+Задание 24: геометрическая задача на доказательство
+Задание 25: комплексная геометрическая задача повышенной сложности
+Сводное повторение части 1 (задания 1–19): разбор сложных случаев по темам
+Сводное повторение части 2 (задания 20–25): разбор сложных случаев по темам`;
 
 const TAB_ORDER: MethodNoteTabKey[] = ["theory", "rules", "tasks", "test", "homework"];
 const TAB_LABELS: Record<MethodNoteTabKey, string> = {
@@ -53,6 +98,7 @@ interface Props {
 export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setActiveId }: Props) {
   const [creating, setCreating] = useState(false);
   const [newTopic, setNewTopic] = useState("");
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
   const active = notes.find((n) => n.id === activeId) || null;
 
   const [activeTab, setActiveTab] = useState<MethodNoteTabKey>("theory");
@@ -110,6 +156,14 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     if (activeId === id) setActiveId(next[0]?.id ?? null);
   };
 
+  const handleBulkAdd = (grade: string, subject: string, lines: string[]) => {
+    const newNotes = lines.map((topic) => ({ ...emptyNote(), topic, grade, subject }));
+    if (newNotes.length === 0) return;
+    saveNotes([...notes, ...newNotes]);
+    setShowBulkAdd(false);
+    showToast(`Добавлено тем: ${newNotes.length}`);
+  };
+
   return (
     <div>
       <PageHeader title="Методика" subtitle="Как вы объясняете темы: порядок подачи, приёмы, разбор типичных ошибок" />
@@ -134,6 +188,11 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           <PrimaryButton icon={Plus} full onClick={() => setCreating(true)}>
             Тема методики
           </PrimaryButton>
+          <div className="mt-2">
+            <GhostButton icon={ListPlus} full onClick={() => setShowBulkAdd(true)}>
+              Добавить список тем
+            </GhostButton>
+          </div>
           {creating && (
             <Card className="mt-2 p-3 space-y-2">
               <TextInput
@@ -246,7 +305,58 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           )}
         </div>
       </div>
+
+      {showBulkAdd && <BulkAddModal onClose={() => setShowBulkAdd(false)} onSubmit={handleBulkAdd} />}
     </div>
+  );
+}
+
+function BulkAddModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (grade: string, subject: string, lines: string[]) => void;
+}) {
+  const [grade, setGrade] = useState("9 класс");
+  const [subject, setSubject] = useState("Подготовка к ОГЭ");
+  const [text, setText] = useState(OGE_PREP_TEMPLATE);
+
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  return (
+    <Modal title="Добавить список тем" onClose={onClose} wide>
+      <div className="space-y-3">
+        <div className="flex gap-1.5">
+          <Select
+            value={grade}
+            onChange={(v) => {
+              const opts = subjectsForGrade(v);
+              setGrade(v);
+              if (!opts.includes(subject)) setSubject(opts[0]);
+            }}
+            options={GRADES}
+          />
+          <Select value={subject} onChange={setSubject} options={subjectsForGrade(grade)} />
+        </div>
+        <TextArea
+          className="min-h-[320px] text-sm font-mono"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="По одной теме на строку"
+        />
+        <div className="text-xs text-gray-400">Тем к добавлению: {lines.length}</div>
+        <div className="flex justify-end gap-2">
+          <GhostButton onClick={onClose}>Отмена</GhostButton>
+          <PrimaryButton icon={ListPlus} onClick={() => onSubmit(grade, subject, lines)} disabled={lines.length === 0}>
+            Добавить{lines.length > 0 ? ` (${lines.length})` : ""}
+          </PrimaryButton>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
