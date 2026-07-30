@@ -43,6 +43,7 @@ export function AttachmentsField({ attachments, onChange, label = "Файлы", 
               href={a.url}
               target="_blank"
               rel="noreferrer"
+              download={a.name}
               className="group inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition"
             >
               <Paperclip size={12} className="shrink-0" />

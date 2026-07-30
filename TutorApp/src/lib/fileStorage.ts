@@ -28,7 +28,13 @@ export async function uploadAttachment(file: File, folder?: string): Promise<Att
   if (!owner) throw new Error("Не авторизован");
 
   const id = uid();
-  const path = `${owner}/${id}-${file.name}`;
+  // Storage keys must be plain ASCII — Cyrillic, spaces, and punctuation in
+  // the original file name (common here, e.g. "Задачник ОГЭ (Аделина).pdf")
+  // make Supabase reject the upload with "Invalid key". The original name
+  // is kept for display in `Attachment.name`; only the storage path is
+  // reduced to the id plus a sanitized extension.
+  const ext = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  const path = `${owner}/${id}${ext ? `.${ext}` : ""}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
 
