@@ -58,8 +58,8 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
         <StatCard color="blue" icon={TrendingUp} label="До конца месяца" sub="Прогноз дохода" value={fmtMoney(monthForecast)} onClick={() => setView("schedule")} />
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_320px] gap-4">
-        <div className="space-y-4">
+      <div className="grid lg:grid-cols-[1fr_320px] gap-4 min-w-0">
+        <div className="space-y-4 min-w-0">
           <Card className="p-5">
             <div className="font-semibold flex items-center gap-2 mb-4">
               <TrendingUp size={17} className="text-[#2563EB]" /> Динамика доходов <span className="text-xs text-gray-400 font-normal ml-1">за 14 дней</span>
@@ -201,13 +201,11 @@ function MiniChart({ data, color }: { data: number[]; color: string }) {
     .join(" ");
   const allZero = data.every((v) => v === 0);
   return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ minWidth: 400 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <line key={i} x1={0} x2={w} y1={pad + (i * (h - pad * 2)) / 3} y2={pad + (i * (h - pad * 2)) / 3} stroke="#F0F1F4" strokeDasharray="4 4" />
-        ))}
-        {!allZero && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-      </svg>
-    </div>
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
+      {[0, 1, 2, 3].map((i) => (
+        <line key={i} x1={0} x2={w} y1={pad + (i * (h - pad * 2)) / 3} y2={pad + (i * (h - pad * 2)) / 3} stroke="#F0F1F4" strokeDasharray="4 4" />
+      ))}
+      {!allZero && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+    </svg>
   );
 }
