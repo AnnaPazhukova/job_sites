@@ -280,14 +280,12 @@ export function StudentDetailPage({
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Дата заведения">
-                <TextInput icon={CalendarIcon} value={fmtDateRu(student.joinedAt)} readOnly />
-              </Field>
-              <Field label="Дата рождения">
-                <TextInput icon={Cake} type="date" value={student.birthDate || ""} onChange={(e) => save({ birthDate: e.target.value })} />
-              </Field>
-            </div>
+            <Field label="Дата заведения">
+              <TextInput icon={CalendarIcon} value={fmtDateRu(student.joinedAt)} readOnly />
+            </Field>
+            <Field label="Дата рождения">
+              <TextInput icon={Cake} type="date" value={student.birthDate || ""} onChange={(e) => save({ birthDate: e.target.value })} />
+            </Field>
             <Field label="E-mail">
               <TextInput icon={Mail} type="email" value={student.email || ""} onChange={(e) => save({ email: e.target.value })} />
             </Field>
@@ -632,14 +630,12 @@ export function LessonFormModal({
               <TextInput icon={User} value={studentName} readOnly />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Дата">
-                <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </Field>
-              <Field label="Время">
-                <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-              </Field>
-            </div>
+            <Field label="Дата">
+              <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </Field>
+            <Field label="Время">
+              <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Длительность, мин">
                 <TextInput type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} />

@@ -128,24 +128,22 @@ function AddSlotForm({
   return (
     <Card className="p-3 mb-3">
       <form onSubmit={submit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="День недели">
-            <select
-              value={weekday}
-              onChange={(e) => setWeekday(Number(e.target.value))}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
-            >
-              {WEEKDAYS_RU.map((l, i) => (
-                <option key={i} value={i}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Время">
-            <TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          </Field>
-        </div>
+        <Field label="День недели">
+          <select
+            value={weekday}
+            onChange={(e) => setWeekday(Number(e.target.value))}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
+          >
+            {WEEKDAYS_RU.map((l, i) => (
+              <option key={i} value={i}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Время">
+          <TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </Field>
         {options.length > 0 ? (
           <Field label="Ученик или группа">
             <select value={who} onChange={(e) => selectWho(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">

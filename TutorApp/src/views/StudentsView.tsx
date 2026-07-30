@@ -200,14 +200,12 @@ function AddStudentModal({
             <TextInput value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Петров" />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Дата рождения">
-            <TextInput icon={CalendarIcon} type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-          </Field>
-          <Field label="Стоимость занятия, ₽">
-            <TextInput icon={Wallet} type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1500" />
-          </Field>
-        </div>
+        <Field label="Дата рождения">
+          <TextInput icon={CalendarIcon} type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+        </Field>
+        <Field label="Стоимость занятия, ₽">
+          <TextInput icon={Wallet} type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1500" />
+        </Field>
         <Field label="Время проведения урока">
           <DurationPicker value={duration} onChange={setDuration} />
         </Field>
