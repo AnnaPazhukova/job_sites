@@ -220,6 +220,11 @@ export default function StudentPortal({ code, onExit }: Props) {
                               <div className="text-xs text-gray-500 mt-0.5">{h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
+                              {h.grade != null && (
+                                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">
+                                  {h.grade}
+                                </span>
+                              )}
                               <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[normalizeHomeworkStatus(h.status)].color}`}>
                                 {HW_STATUS_META[normalizeHomeworkStatus(h.status)].label}
                               </span>

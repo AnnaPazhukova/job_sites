@@ -189,6 +189,11 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                     </div>
                   )}
                 </div>
+                {h.grade != null && (
+                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold shrink-0">
+                    {h.grade}
+                  </span>
+                )}
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
                 {h.status !== "done" && (
                   <button
@@ -247,11 +252,12 @@ export function HomeworkEditModal({
   const [status, setStatus] = useState<HomeworkStatus>(normalizeHomeworkStatus(homework.status));
   const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
   const [reviewComment, setReviewComment] = useState(homework.reviewComment || "");
+  const [grade, setGrade] = useState<number | undefined>(homework.grade);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments, reviewComment: reviewComment.trim() || undefined });
+    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments, reviewComment: reviewComment.trim() || undefined, grade });
   }
 
   return (
@@ -285,6 +291,23 @@ export function HomeworkEditModal({
               </button>
             ))}
           </div>
+        </Field>
+        <Field label="Оценка">
+          <div className="grid grid-cols-4 gap-2">
+            {[2, 3, 4, 5].map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGrade((cur) => (cur === g ? undefined : g))}
+                className={`py-2 rounded-xl text-sm font-medium border transition ${
+                  grade === g ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"
+                }`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">Необязательно. Увидит ученик в личном кабинете.</div>
         </Field>
         <Field label="Комментарий о выполнении">
           <textarea
