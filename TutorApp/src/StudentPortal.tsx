@@ -251,6 +251,7 @@ export default function StudentPortal({ code, onExit }: Props) {
                                   href={a.url}
                                   target="_blank"
                                   rel="noreferrer"
+                                  download={a.name}
                                   className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200"
                                 >
                                   <Paperclip size={11} /> {a.name}
@@ -340,6 +341,7 @@ function MessagesTab({
                     href={a.url}
                     target="_blank"
                     rel="noreferrer"
+                    download={a.name}
                     className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 max-w-[180px]"
                   >
                     <Paperclip size={11} className="shrink-0" /> <span className="truncate">{a.name}</span>
