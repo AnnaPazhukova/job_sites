@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ArrowRight,
   BookOpen,
   Cake,
   Calendar as CalendarIcon,
@@ -8,6 +9,7 @@ import {
   Clock,
   Copy,
   KeyRound,
+  Layers,
   Mail,
   MessageCircle,
   Plus,
@@ -442,39 +444,60 @@ export function StudentDetailPage({
           <div className="py-14 text-center text-gray-400 text-sm">Занятий пока нет</div>
         ) : (
           <div className="divide-y divide-[#F0F1F4]">
-            {studentLessons.map((l, i) => (
-              <div key={l.id} className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3.5 hover:bg-[#FAFBFC]">
-                <span className="text-sm text-gray-400 w-6 shrink-0">{String(studentLessons.length - i).padStart(2, "0")}</span>
-                <button
-                  onClick={() => {
-                    setEditLesson(l);
-                    setShowLessonForm(true);
-                  }}
-                  className="text-sm font-medium shrink-0 text-left hover:text-[#2563EB]"
-                >
-                  {fmtDateRu(l.date)}
-                </button>
-                <span
-                  className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
-                  ${l.status === "cancelled" ? "bg-gray-100 text-gray-400" : "bg-blue-50 text-[#2563EB]"}`}
-                >
-                  <Clock size={13} /> {l.status === "cancelled" ? "Отменено" : "Запланировано"}
-                </span>
-                <span
-                  className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
-                  ${l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}
-                >
-                  <Wallet size={13} /> {l.paymentStatus === "paid" ? "Оплачено" : "Ожидает оплаты"}
-                </span>
-                <button
-                  onClick={() => (l.status === "cancelled" ? null : cancelLesson(l.id))}
-                  disabled={l.status === "cancelled"}
-                  className="w-full sm:w-auto sm:ml-auto bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition shrink-0"
-                >
-                  Отменить
-                </button>
-              </div>
-            ))}
+            {studentLessons.map((l, i) => {
+              const topic = l.noteId ? notes.find((n) => n.id === l.noteId)?.topic : null;
+              const held = l.status !== "cancelled" && isLessonPast(l);
+              return (
+                <div key={l.id} className="px-4 sm:px-5 py-3.5 hover:bg-[#FAFBFC]">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-sm text-gray-400 w-6 shrink-0">{String(studentLessons.length - i).padStart(2, "0")}</span>
+                    <button
+                      onClick={() => {
+                        setEditLesson(l);
+                        setShowLessonForm(true);
+                      }}
+                      className="text-sm font-medium shrink-0 text-left hover:text-[#2563EB]"
+                    >
+                      {fmtDateRu(l.date)}
+                    </button>
+                    <span
+                      className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
+                      ${l.status === "cancelled" ? "bg-gray-100 text-gray-400" : held ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-[#2563EB]"}`}
+                    >
+                      <Clock size={13} /> {l.status === "cancelled" ? "Отменено" : held ? "Проведено" : "Запланировано"}
+                    </span>
+                    <span
+                      className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
+                      ${l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}
+                    >
+                      <Wallet size={13} /> {l.paymentStatus === "paid" ? "Оплачено" : "Ожидает оплаты"}
+                    </span>
+                    <button
+                      onClick={() => (l.status === "cancelled" ? null : cancelLesson(l.id))}
+                      disabled={l.status === "cancelled"}
+                      className="w-full sm:w-auto sm:ml-auto bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition shrink-0"
+                    >
+                      Отменить
+                    </button>
+                  </div>
+                  {(topic || l.nextPlan) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 pl-9 text-xs text-gray-500">
+                      {topic && (
+                        <span className="inline-flex items-center gap-1">
+                          <Layers size={12} className="text-gray-400 shrink-0" /> {topic}
+                        </span>
+                      )}
+                      {l.nextPlan && (
+                        <span className="inline-flex items-center gap-1 min-w-0">
+                          <ArrowRight size={12} className="text-gray-400 shrink-0" />
+                          <span className="truncate">План: {l.nextPlan}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>
@@ -579,6 +602,7 @@ export function LessonFormModal({
   const [price, setPrice] = useState(lesson?.price ?? defaultRate ?? 0);
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
   const [comment, setComment] = useState(lesson?.comment || "");
+  const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
   const [hwText, setHwText] = useState("");
   const [editingHw, setEditingHw] = useState(false);
@@ -608,7 +632,17 @@ export function LessonFormModal({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (isEdit) {
-      onSave({ id: lesson!.id, date, time, duration: Number(duration), price: Number(price), paymentStatus, comment, noteId: noteId || undefined });
+      onSave({
+        id: lesson!.id,
+        date,
+        time,
+        duration: Number(duration),
+        price: Number(price),
+        paymentStatus,
+        comment,
+        nextPlan: nextPlan || undefined,
+        noteId: noteId || undefined,
+      });
     } else {
       onSave({ date, time, duration: Number(duration), price: Number(price), occurrences: buildOccurrences() });
     }
@@ -706,16 +740,26 @@ export function LessonFormModal({
             </Field>
 
             <div className="grid sm:grid-cols-2 gap-5">
-              <Field label="Комментарий об уроке">
-              <TextArea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={8}
-                placeholder="Как прошёл урок, что отработали, на что обратить внимание..."
-              />
-            </Field>
+              <div className="space-y-4">
+                <Field label="Комментарий об уроке">
+                  <TextArea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    rows={5}
+                    placeholder="Как прошёл урок, что отработали, на что обратить внимание..."
+                  />
+                </Field>
+                <Field label="План на следующий урок">
+                  <TextArea
+                    value={nextPlan}
+                    onChange={(e) => setNextPlan(e.target.value)}
+                    rows={3}
+                    placeholder="Что разобрать в следующий раз..."
+                  />
+                </Field>
+              </div>
 
-            {lesson!.studentId && (
+              {lesson!.studentId && (
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1.5">Домашнее задание</div>
                 {linkedHomework ? (
