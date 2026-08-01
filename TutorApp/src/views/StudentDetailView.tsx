@@ -25,6 +25,7 @@ import {
   buildRecurringDates,
   fmtDateRu,
   GRADES,
+  isLessonPast,
   normalizeHomeworkStatus,
   SUBSCRIPTION_SIZES,
   TODAY_KEY,
@@ -590,7 +591,7 @@ export function LessonFormModal({
   const [count, setCount] = useState(8);
   const [untilDate, setUntilDate] = useState("");
 
-  const isPast = isEdit && lesson!.date <= TODAY_KEY;
+  const isPast = isEdit && isLessonPast(lesson!);
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";

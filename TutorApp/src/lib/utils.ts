@@ -81,6 +81,17 @@ export const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 export const TODAY_KEY = dateKey(TODAY);
 
+// A lesson counts as "conducted" once it has actually ended — comparing
+// only dates would mark a lesson later today as past the moment the date
+// rolls over, hours before the tutor has even taught it.
+export function isLessonPast(lesson: { date: string; time: string; duration: number }, now: Date = new Date()): boolean {
+  const [y, mo, d] = lesson.date.split("-").map(Number);
+  const [h, m] = lesson.time.split(":").map(Number);
+  const end = new Date(y, mo - 1, d, h, m || 0);
+  end.setMinutes(end.getMinutes() + (lesson.duration || 0));
+  return end.getTime() <= now.getTime();
+}
+
 export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
 }

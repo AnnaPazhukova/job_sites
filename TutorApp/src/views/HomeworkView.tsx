@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
@@ -37,7 +37,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
   const [presetLesson, setPresetLesson] = useState<Lesson | null>(null);
 
   const missingHwLessons = lessons
-    .filter((l) => l.studentId && l.status !== "cancelled" && l.date <= TODAY_KEY && !homework.some((h) => h.lessonId === l.id))
+    .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !homework.some((h) => h.lessonId === l.id))
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   function updateHomework(id: string, patch: Partial<Homework>) {

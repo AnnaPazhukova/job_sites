@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { dateKey, lessonPillStyle, TODAY, TODAY_KEY, WEEKDAYS_RU } from "../lib/utils";
+import { dateKey, isLessonPast, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
@@ -47,7 +47,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
-    const isPast = l.date < TODAY_KEY;
+    const isPast = isLessonPast(l);
     const color = students.find((s) => s.id === l.studentId)?.color;
     const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
