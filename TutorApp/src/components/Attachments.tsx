@@ -10,29 +10,68 @@ interface Props {
   folder?: string;
 }
 
+const isImage = (a: Attachment) => a.mimeType?.startsWith("image/");
+
+function ImageThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      title={a.name}
+      className="group/thumb relative block h-24 w-24 rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow transition"
+    >
+      <img src={a.url} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white opacity-0 group-hover/thumb:opacity-100 hover:bg-black/70 transition"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </a>
+  );
+}
+
+function FilePill({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      download={a.name}
+      className={`group inline-flex items-center gap-1.5 pl-2.5 ${onRemove ? "pr-1.5" : "pr-3"} py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition`}
+    >
+      <Paperclip size={12} className="shrink-0" />
+      <span className="truncate">{a.name}</span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="shrink-0 p-0.5 rounded hover:bg-gray-300 opacity-60 hover:opacity-100"
+        >
+          <X size={11} />
+        </button>
+      )}
+    </a>
+  );
+}
+
 export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   if (attachments.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      {attachments.map((a) =>
-        a.mimeType?.startsWith("image/") ? (
-          <a key={a.id} href={a.url} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition">
-            <img src={a.url} alt={a.name} className="h-24 w-24 object-cover" />
-          </a>
-        ) : (
-          <a
-            key={a.id}
-            href={a.url}
-            target="_blank"
-            rel="noreferrer"
-            download={a.name}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition"
-          >
-            <Paperclip size={12} className="shrink-0" />
-            <span className="truncate">{a.name}</span>
-          </a>
-        )
-      )}
+      {attachments.map((a) => (isImage(a) ? <ImageThumb key={a.id} a={a} /> : <FilePill key={a.id} a={a} />))}
     </div>
   );
 }
@@ -64,30 +103,13 @@ export function AttachmentsField({ attachments, onChange, label = "Файлы", 
       <div className="text-sm font-medium text-gray-700 mb-1.5">{label}</div>
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {attachments.map((a) => (
-            <a
-              key={a.id}
-              href={a.url}
-              target="_blank"
-              rel="noreferrer"
-              download={a.name}
-              className="group inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition"
-            >
-              <Paperclip size={12} className="shrink-0" />
-              <span className="truncate">{a.name}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  remove(a.id);
-                }}
-                className="shrink-0 p-0.5 rounded hover:bg-gray-300 opacity-60 hover:opacity-100"
-              >
-                <X size={11} />
-              </button>
-            </a>
-          ))}
+          {attachments.map((a) =>
+            isImage(a) ? (
+              <ImageThumb key={a.id} a={a} onRemove={() => remove(a.id)} />
+            ) : (
+              <FilePill key={a.id} a={a} onRemove={() => remove(a.id)} />
+            )
+          )}
         </div>
       )}
       {fileStorageEnabled ? (
