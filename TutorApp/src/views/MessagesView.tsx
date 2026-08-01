@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, PageHeader } from "../components/ui";
-import { AttachmentsField } from "../components/Attachments";
+import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { uid } from "../lib/utils";
 import type { Attachment, MessagesByStudent, Student } from "../lib/types";
 
@@ -85,19 +85,8 @@ export function MessagesView({ students, messages, setMessages }: Props) {
                   </div>
                 )}
                 {m.attachments && m.attachments.length > 0 && (
-                  <div className={`flex flex-wrap gap-1.5 ${m.text ? "mt-1.5" : ""} ${m.from === "me" ? "justify-end" : ""}`}>
-                    {m.attachments.map((a) => (
-                      <a
-                        key={a.id}
-                        href={a.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={a.name}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 max-w-[180px]"
-                      >
-                        <Paperclip size={11} className="shrink-0" /> <span className="truncate">{a.name}</span>
-                      </a>
-                    ))}
+                  <div className={`${m.text ? "mt-1.5" : ""} ${m.from === "me" ? "flex justify-end" : ""}`}>
+                    <AttachmentList attachments={m.attachments} />
                   </div>
                 )}
               </div>
