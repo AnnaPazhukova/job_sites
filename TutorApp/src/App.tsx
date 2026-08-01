@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
@@ -9,7 +9,6 @@ import {
   MessageCircle,
   TrendingUp,
   Users,
-  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { useStore } from "./lib/storage";
@@ -29,7 +28,6 @@ import { StatsView } from "./views/StatsView";
 
 const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon; disabled?: boolean }[] = [
   { id: "students", label: "Мои ученики", icon: Users },
-  { id: "groups", label: "Группы", icon: UsersRound },
   { id: "schedule", label: "Расписание", icon: Calendar },
   { id: "messages", label: "Сообщения", icon: MessageCircle },
   { id: "homework", label: "Проверка ДЗ", icon: BookOpen },
@@ -45,6 +43,7 @@ interface AppProps {
 
 export default function App({ userEmail, onSignOut }: AppProps) {
   const [view, setView] = useState<ViewId>("students");
+  const [studentsTab, setStudentsTab] = useState<"students" | "groups">("students");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -161,15 +160,29 @@ export default function App({ userEmail, onSignOut }: AppProps) {
           ) : (
             <>
               {view === "students" && (
-                <StudentsView
-                  students={students}
-                  setStudents={setStudents}
-                  groups={groups}
-                  lessons={lessons}
-                  setView={setView}
-                  showToast={showToast}
-                  setSelectedStudentId={setSelectedStudentId}
-                />
+                <div>
+                  <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-gray-100 mb-4">
+                    <SegTab active={studentsTab === "students"} onClick={() => setStudentsTab("students")}>
+                      Ученики
+                    </SegTab>
+                    <SegTab active={studentsTab === "groups"} onClick={() => setStudentsTab("groups")}>
+                      Группы
+                    </SegTab>
+                  </div>
+                  {studentsTab === "students" ? (
+                    <StudentsView
+                      students={students}
+                      setStudents={setStudents}
+                      groups={groups}
+                      lessons={lessons}
+                      setView={setView}
+                      showToast={showToast}
+                      setSelectedStudentId={setSelectedStudentId}
+                    />
+                  ) : (
+                    <GroupsView groups={groups} setGroups={setGroups} students={students} showToast={showToast} />
+                  )}
+                </div>
               )}
               {view === "student-detail" && (
                 <StudentDetailPage
@@ -187,7 +200,6 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   showToast={showToast}
                 />
               )}
-              {view === "groups" && <GroupsView groups={groups} setGroups={setGroups} students={students} showToast={showToast} />}
               {view === "schedule" && (
                 <ScheduleView
                   lessons={lessons}
@@ -237,6 +249,19 @@ export default function App({ userEmail, onSignOut }: AppProps) {
         @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 8px);} to { opacity:1; transform: translate(-50%,0);} }
       `}</style>
     </div>
+  );
+}
+
+function SegTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
+        active ? "bg-white text-[#2563EB] shadow-sm" : "text-gray-500 hover:text-gray-700"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

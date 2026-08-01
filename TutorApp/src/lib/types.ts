@@ -135,7 +135,6 @@ export interface WeeklyTemplateSlot {
 export type ViewId =
   | "students"
   | "student-detail"
-  | "groups"
   | "schedule"
   | "messages"
   | "homework"
