@@ -1,3 +1,4 @@
+import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { dateKey, isLessonPast, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
@@ -32,6 +33,15 @@ function addMinutes(time: string, minutes: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function NowLine({ time }: { time: string }) {
+  return (
+    <div className="flex items-center gap-1.5 py-0.5 px-0.5">
+      <span className="text-[10px] font-bold text-red-500 tabular-nums shrink-0">{time}</span>
+      <div className="flex-1 h-[2px] rounded-full bg-red-500" />
+    </div>
+  );
+}
+
 interface Props {
   cursor: Date;
   lessons: Lesson[];
@@ -44,6 +54,14 @@ interface Props {
 export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick }: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
@@ -69,6 +87,8 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
         const key = dateKey(d);
         const dayLessons = lessons.filter((l) => l.date === key).sort((a, b) => a.time.localeCompare(b.time));
         const dayGcal = gcalEvents.filter((e) => e.date === key).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+        const todayCol = isToday(d);
+        const nowIndex = todayCol ? dayLessons.findIndex((l) => timeToMinutes(l.time) > nowMinutes) : -1;
         return (
           <div key={i} className="min-h-[440px] flex flex-col">
             <div className={`text-center py-3 border-b border-[#F0F1F4] ${isToday(d) ? "bg-[#EEF2FF]" : "bg-[#FAFBFC]"}`}>
@@ -96,29 +116,33 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                   <ExternalLink size={11} className="shrink-0 mt-0.5" />
                 </a>
               ))}
-              {dayLessons.map((l) => {
+              {dayLessons.map((l, idx) => {
                 const appearance = lessonAppearance(l);
                 const hasCustomColor = !!appearance.style;
                 return (
-                  <button
-                    key={l.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onLessonClick(l);
-                    }}
-                    style={appearance.style}
-                    className={`w-full text-left text-[11px] px-2 py-1.5 rounded-lg font-medium transition ${appearance.className}`}
-                  >
-                    <div className="flex items-center gap-1">
-                      {hasCustomColor && l.status !== "cancelled" && (
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
-                      )}
-                      {l.time}–{addMinutes(l.time, l.duration)}
-                    </div>
-                    <div className="truncate">{l.title}</div>
-                  </button>
+                  <Fragment key={l.id}>
+                    {todayCol && idx === nowIndex && <NowLine time={nowLabel} />}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLessonClick(l);
+                      }}
+                      style={appearance.style}
+                      className={`w-full text-left text-[11px] px-2 py-1.5 rounded-lg font-medium transition ${appearance.className}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {hasCustomColor && l.status !== "cancelled" && (
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
+                        )}
+                        {l.time}–{addMinutes(l.time, l.duration)}
+                      </div>
+                      <div className="truncate">{l.title}</div>
+                    </button>
+                  </Fragment>
                 );
               })}
+              {todayCol && dayLessons.length > 0 && nowIndex === -1 && <NowLine time={nowLabel} />}
+              {todayCol && dayLessons.length === 0 && <NowLine time={nowLabel} />}
               {dayLessons.length === 0 && dayGcal.length === 0 && <div className="text-center text-[11px] text-gray-300 pt-4">Пусто</div>}
             </div>
           </div>

@@ -47,6 +47,8 @@ export interface Lesson {
   comment?: string;
   /** Methodology topic covered in this lesson (see MethodNote). */
   noteId?: string;
+  /** Tutor's plan for the next lesson, set when reviewing this one. */
+  nextPlan?: string;
 }
 
 // assigned: given to the student, not yet turned in.
