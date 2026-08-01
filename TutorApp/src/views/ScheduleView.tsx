@@ -5,10 +5,10 @@ import {
   buildHomeworkAssignment,
   buildRecurringDates,
   dateKey,
+  isLessonPast,
   lessonPillStyle,
   MONTHS_RU,
   TODAY,
-  TODAY_KEY,
   WEEKDAYS_RU,
   uid,
   type RecurrenceEnd,
@@ -109,7 +109,7 @@ export function ScheduleView({
 
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
-    const isPast = l.date < TODAY_KEY;
+    const isPast = isLessonPast(l);
     const color = students.find((s) => s.id === l.studentId)?.color;
     const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
