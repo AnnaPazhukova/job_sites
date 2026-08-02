@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
+import { BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
@@ -47,6 +47,127 @@ function sortedHomework(homework: Homework[]): Homework[] {
     if (b.due) return 1;
     return 0;
   });
+}
+
+// A student is unlikely to ever revisit homework the tutor has already
+// reviewed — split it off into a collapsed section so the list opens on
+// what still needs attention.
+function HomeworkTabContent({
+  homework,
+  lessons,
+  notes,
+  onOpen,
+}: {
+  homework: Homework[];
+  lessons: Lesson[];
+  notes: MethodNote[];
+  onOpen: (lesson: Lesson | null, h: Homework) => void;
+}) {
+  const [showDone, setShowDone] = useState(false);
+
+  if (homework.length === 0) {
+    return <EmptyState icon={BookOpen} title="Домашних заданий пока нет" />;
+  }
+
+  const active = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) !== "done"));
+  const done = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) === "done"));
+
+  return (
+    <div className="space-y-5">
+      {active.length > 0 ? (
+        <Card className="divide-y divide-[#F0F1F4]">
+          {active.map((h) => (
+            <HomeworkRow key={h.id} h={h} lessons={lessons} notes={notes} onOpen={onOpen} />
+          ))}
+        </Card>
+      ) : (
+        <div className="py-10 text-center text-gray-400 text-sm">Невыполненных заданий нет 🎉</div>
+      )}
+
+      {done.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowDone((s) => !s)}
+            className="w-full flex items-center justify-between px-1 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition"
+          >
+            <span>Выполненные ({done.length})</span>
+            <ChevronDown size={16} className={`transition-transform ${showDone ? "rotate-180" : ""}`} />
+          </button>
+          {showDone && (
+            <Card className="divide-y divide-[#F0F1F4] mt-2">
+              {done.map((h) => (
+                <HomeworkRow key={h.id} h={h} lessons={lessons} notes={notes} onOpen={onOpen} />
+              ))}
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomeworkRow({
+  h,
+  lessons,
+  notes,
+  onOpen,
+}: {
+  h: Homework;
+  lessons: Lesson[];
+  notes: MethodNote[];
+  onOpen: (lesson: Lesson | null, h: Homework) => void;
+}) {
+  const note = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
+  const lesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
+  const status = normalizeHomeworkStatus(h.status);
+  const needsAttachment = status === "assigned";
+
+  return (
+    <div onClick={() => onOpen(lesson || null, h)} className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <div className="font-medium text-sm">{h.title}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {h.grade != null && (
+            <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">{h.grade}</span>
+          )}
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
+        </div>
+      </div>
+      {(note || lesson || (h.attachments && h.attachments.length > 0) || needsAttachment) && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {note && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB]">
+              <Layers size={11} /> {note.topic}
+            </span>
+          )}
+          {lesson && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+              <Calendar size={11} /> урок {fmtDateRu(lesson.date)}
+            </span>
+          )}
+          {h.attachments && h.attachments.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
+              <Paperclip size={11} /> {h.attachments.length} {h.attachments.length === 1 ? "файл" : "файла"}
+            </span>
+          )}
+          {needsAttachment && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-50 text-amber-700">
+              Прикрепите фото, чтобы сдать
+            </span>
+          )}
+        </div>
+      )}
+      {h.reviewComment && (
+        <div className="mt-2.5 px-3 py-2 rounded-lg bg-blue-50 text-sm text-gray-700">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-0.5">Комментарий преподавателя</div>
+          {h.reviewComment}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -237,72 +358,12 @@ export default function StudentPortal({ code, onExit }: Props) {
             {tab === "messages" && <MessagesTab code={code} messages={messages} setMessages={setMessages} showToast={showToast} />}
 
             {tab === "homework" && (
-              <div>
-                {homework.length === 0 ? (
-                  <EmptyState icon={BookOpen} title="Домашних заданий пока нет" />
-                ) : (
-                  <Card className="divide-y divide-[#F0F1F4]">
-                    {sortedHomework(homework).map((h) => {
-                      const note = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
-                      const lesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
-                      const status = normalizeHomeworkStatus(h.status);
-                      const needsAttachment = status === "assigned";
-                      return (
-                        <div
-                          key={h.id}
-                          onClick={() => setOpenDetail({ lesson: lesson || undefined, homework: h, initialTab: "homework" })}
-                          className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition"
-                        >
-                          <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
-                              <div className="font-medium text-sm">{h.title}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}</div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {h.grade != null && (
-                                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">
-                                  {h.grade}
-                                </span>
-                              )}
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
-                            </div>
-                          </div>
-                          {(note || lesson || (h.attachments && h.attachments.length > 0) || needsAttachment) && (
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              {note && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB]">
-                                  <Layers size={11} /> {note.topic}
-                                </span>
-                              )}
-                              {lesson && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
-                                  <Calendar size={11} /> урок {fmtDateRu(lesson.date)}
-                                </span>
-                              )}
-                              {h.attachments && h.attachments.length > 0 && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
-                                  <Paperclip size={11} /> {h.attachments.length} {h.attachments.length === 1 ? "файл" : "файла"}
-                                </span>
-                              )}
-                              {needsAttachment && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-50 text-amber-700">
-                                  Прикрепите фото, чтобы сдать
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {h.reviewComment && (
-                            <div className="mt-2.5 px-3 py-2 rounded-lg bg-blue-50 text-sm text-gray-700">
-                              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-0.5">Комментарий преподавателя</div>
-                              {h.reviewComment}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </Card>
-                )}
-              </div>
+              <HomeworkTabContent
+                homework={homework}
+                lessons={lessons}
+                notes={notes}
+                onOpen={(lesson, h) => setOpenDetail({ lesson: lesson || undefined, homework: h, initialTab: "homework" })}
+              />
             )}
           </>
         )}
