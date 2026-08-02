@@ -221,8 +221,12 @@ grant execute on function public.portal_send_message(text, text, jsonb) to anon,
 
 -- Marks one of the link code's own homework items as submitted — the
 -- student says they've done it; the tutor still needs to review and
--- confirm it (see the "done" status, set only by the tutor).
-create or replace function public.portal_mark_homework_done(p_code text, p_homework_id text)
+-- confirm it (see the "done" status, set only by the tutor). The files the
+-- student attached as proof of completion (usually photos) are stored
+-- separately from the tutor's own task attachments.
+drop function if exists public.portal_mark_homework_done(text, text);
+
+create or replace function public.portal_mark_homework_done(p_code text, p_homework_id text, p_attachments jsonb default '[]'::jsonb)
 returns void
 language plpgsql
 security definer
@@ -249,7 +253,7 @@ begin
   select coalesce(jsonb_agg(
     case
       when elem->>'id' = p_homework_id and elem->>'studentId' = v_student
-      then jsonb_set(elem, '{status}', '"submitted"')
+      then jsonb_set(jsonb_set(elem, '{status}', '"submitted"'), '{submissionAttachments}', p_attachments)
       else elem
     end
   ), '[]'::jsonb) into v_next
@@ -259,4 +263,4 @@ begin
 end;
 $$;
 
-grant execute on function public.portal_mark_homework_done(text, text) to anon, authenticated;
+grant execute on function public.portal_mark_homework_done(text, text, jsonb) to anon, authenticated;

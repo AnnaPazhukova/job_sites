@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
-import { AttachmentsField } from "../components/Attachments";
+import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
@@ -264,6 +264,12 @@ export function HomeworkEditModal({
     <Modal title="Домашнее задание" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <div className="text-sm text-gray-500">{homework.studentName}</div>
+        {homework.submissionAttachments && homework.submissionAttachments.length > 0 && (
+          <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1.5">Ответ ученика</div>
+            <AttachmentList attachments={homework.submissionAttachments} />
+          </div>
+        )}
         <Field label="Задание">
           <textarea
             required

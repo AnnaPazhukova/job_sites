@@ -24,8 +24,8 @@ export async function sendStudentMessage(code: string, text: string, attachments
   if (error) throw error;
 }
 
-export async function markStudentHomeworkDone(code: string, id: string): Promise<void> {
+export async function markStudentHomeworkDone(code: string, id: string, attachments: Attachment[] = []): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.rpc("portal_mark_homework_done", { p_code: code, p_homework_id: id });
+  const { error } = await supabase.rpc("portal_mark_homework_done", { p_code: code, p_homework_id: id, p_attachments: attachments });
   if (error) throw error;
 }

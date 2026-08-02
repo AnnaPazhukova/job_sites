@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
-import { AttachmentList } from "./components/Attachments";
-import { AttachmentsField } from "./components/Attachments";
+import { AttachmentList, AttachmentsField } from "./components/Attachments";
 import { fmtDateRu, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
@@ -23,6 +22,21 @@ const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> =
   submitted: { label: "На проверке", color: "bg-amber-50 text-amber-600" },
   done: { label: "Проверено", color: "bg-emerald-50 text-emerald-600" },
 };
+
+// New, not-yet-submitted homework needs attention first — surface it above
+// anything already sent off or already reviewed.
+const HW_SORT_ORDER: Record<HomeworkStatus, number> = { assigned: 0, submitted: 1, done: 2 };
+
+function sortedHomework(homework: Homework[]): Homework[] {
+  return [...homework].sort((a, b) => {
+    const order = HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)];
+    if (order !== 0) return order;
+    if (a.due && b.due) return a.due.localeCompare(b.due);
+    if (a.due) return -1;
+    if (b.due) return 1;
+    return 0;
+  });
+}
 
 interface Props {
   code: string;
@@ -94,11 +108,11 @@ export default function StudentPortal({ code, onExit }: Props) {
     });
   }
 
-  async function submitHomework(id: string) {
-    setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "submitted" } : h)));
-    setOpenHw((h) => (h && h.id === id ? { ...h, status: "submitted" } : h));
+  async function submitHomework(id: string, attachments: Attachment[]) {
+    setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "submitted", submissionAttachments: attachments } : h)));
+    setOpenHw((h) => (h && h.id === id ? { ...h, status: "submitted", submissionAttachments: attachments } : h));
     try {
-      await markStudentHomeworkDone(code, id);
+      await markStudentHomeworkDone(code, id, attachments);
       showToast("Отправлено репетитору на проверку");
     } catch {
       showToast("Не удалось сохранить, попробуйте ещё раз");
@@ -212,9 +226,11 @@ export default function StudentPortal({ code, onExit }: Props) {
                   <EmptyState icon={BookOpen} title="Домашних заданий пока нет" />
                 ) : (
                   <Card className="divide-y divide-[#F0F1F4]">
-                    {homework.map((h) => {
+                    {sortedHomework(homework).map((h) => {
                       const note = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
                       const lesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
+                      const status = normalizeHomeworkStatus(h.status);
+                      const needsAttachment = status === "assigned";
                       return (
                         <div key={h.id} onClick={() => setOpenHw(h)} className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -228,23 +244,10 @@ export default function StudentPortal({ code, onExit }: Props) {
                                   {h.grade}
                                 </span>
                               )}
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[normalizeHomeworkStatus(h.status)].color}`}>
-                                {HW_STATUS_META[normalizeHomeworkStatus(h.status)].label}
-                              </span>
-                              {normalizeHomeworkStatus(h.status) === "assigned" && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    submitHomework(h.id);
-                                  }}
-                                  className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition"
-                                >
-                                  <Check size={13} /> Сдать
-                                </button>
-                              )}
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
                             </div>
                           </div>
-                          {(note || lesson || (h.attachments && h.attachments.length > 0)) && (
+                          {(note || lesson || (h.attachments && h.attachments.length > 0) || needsAttachment) && (
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                               {note && (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB]">
@@ -256,18 +259,16 @@ export default function StudentPortal({ code, onExit }: Props) {
                                   <Calendar size={11} /> урок {fmtDateRu(lesson.date)}
                                 </span>
                               )}
-                              {h.attachments?.map((a) => (
-                                <a
-                                  key={a.id}
-                                  href={a.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  download={a.name}
-                                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                >
-                                  <Paperclip size={11} /> {a.name}
-                                </a>
-                              ))}
+                              {h.attachments && h.attachments.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
+                                  <Paperclip size={11} /> {h.attachments.length} {h.attachments.length === 1 ? "файл" : "файла"}
+                                </span>
+                              )}
+                              {needsAttachment && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-50 text-amber-700">
+                                  Прикрепите фото, чтобы сдать
+                                </span>
+                              )}
                             </div>
                           )}
                           {h.reviewComment && (
@@ -289,6 +290,7 @@ export default function StudentPortal({ code, onExit }: Props) {
 
       {openHw && (
         <HomeworkDetailModal
+          code={code}
           homework={openHw}
           lesson={openHw.lessonId ? lessons.find((l) => l.id === openHw.lessonId) : undefined}
           note={openHw.noteId ? notes.find((n) => n.id === openHw.noteId) : undefined}
@@ -308,21 +310,24 @@ export default function StudentPortal({ code, onExit }: Props) {
 }
 
 function HomeworkDetailModal({
+  code,
   homework,
   lesson,
   note,
   onSubmit,
   onClose,
 }: {
+  code: string;
   homework: Homework;
   lesson?: Lesson;
   note?: MethodNote;
-  onSubmit: (id: string) => void;
+  onSubmit: (id: string, attachments: Attachment[]) => void;
   onClose: () => void;
 }) {
   const status = normalizeHomeworkStatus(homework.status);
   const theory = note?.tabs?.theory?.trim();
   const theoryAttachments = note?.attachments?.theory ?? [];
+  const [submissionFiles, setSubmissionFiles] = useState<Attachment[]>(homework.submissionAttachments || []);
 
   return (
     <Modal title={homework.title} onClose={onClose}>
@@ -366,17 +371,36 @@ function HomeworkDetailModal({
           </div>
         )}
 
-        {status === "assigned" && (
-          <PrimaryButton
-            full
-            icon={Check}
-            onClick={() => {
-              onSubmit(homework.id);
-              onClose();
-            }}
-          >
-            Сдать
-          </PrimaryButton>
+        {status === "assigned" ? (
+          <div className="border-t border-[#F0F1F4] pt-4 space-y-3">
+            <AttachmentsField
+              attachments={submissionFiles}
+              onChange={setSubmissionFiles}
+              label="Прикрепите фото или файл с выполненным заданием"
+              folder={`portal-${code}`}
+            />
+            <PrimaryButton
+              full
+              icon={Check}
+              disabled={submissionFiles.length === 0}
+              onClick={() => {
+                onSubmit(homework.id, submissionFiles);
+                onClose();
+              }}
+            >
+              Сдать
+            </PrimaryButton>
+            {submissionFiles.length === 0 && (
+              <div className="text-xs text-gray-400 text-center">Чтобы сдать, сначала прикрепите хотя бы один файл</div>
+            )}
+          </div>
+        ) : (
+          submissionFiles.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Ваш ответ</div>
+              <AttachmentList attachments={submissionFiles} />
+            </div>
+          )
         )}
       </div>
     </Modal>

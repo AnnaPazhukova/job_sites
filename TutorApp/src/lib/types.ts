@@ -74,6 +74,8 @@ export interface Homework {
   noteId?: string;
   lessonId?: string;
   attachments?: Attachment[];
+  /** Files the student attached when submitting — e.g. photos of completed work. */
+  submissionAttachments?: Attachment[];
   /** Tutor's feedback on the reviewed work — visible to the student too. */
   reviewComment?: string;
   /** Grade on the Russian 2-5 school scale — visible to the student too. */
