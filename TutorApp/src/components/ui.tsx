@@ -216,8 +216,8 @@ export function Modal({
   );
 }
 
-export function Avatar({ id, name, size = 40 }: { id: string; name: string; size?: number }) {
-  const bg = colorFor(id);
+export function Avatar({ id, name, size = 40, color }: { id: string; name: string; size?: number; color?: string | null }) {
+  const bg = color || colorFor(id);
   return (
     <div
       style={{ width: size, height: size, background: bg }}

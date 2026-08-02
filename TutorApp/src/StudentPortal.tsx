@@ -270,7 +270,7 @@ export default function StudentPortal({ code, onExit }: Props) {
           <div className="flex items-center gap-3">
             {profile && (
               <div className="hidden sm:flex items-center gap-2">
-                <Avatar id={profile.id} name={profile.name} size={30} />
+                <Avatar id={profile.id} name={profile.name} size={30} color={profile.color} />
                 <span className="text-sm font-medium">{profile.name}</span>
               </div>
             )}

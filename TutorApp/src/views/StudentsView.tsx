@@ -117,13 +117,17 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
             return (
               <Card key={s.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer">
                 <div onClick={() => openStudent(s.id)} className="flex items-start gap-3">
-                  <Avatar id={s.id} name={s.name} size={44} />
+                  <Avatar id={s.id} name={s.name} size={44} color={s.color} />
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold truncate flex items-center gap-1.5">
                       {s.name}
                       {s.favorite && <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{durationLabel(s.duration)}</div>
+                    <div className="text-xs text-gray-500 truncate flex items-center gap-1.5">
+                      {s.grade && <span className="font-medium text-gray-600">{s.grade}</span>}
+                      {s.grade && <span className="text-gray-300">·</span>}
+                      {durationLabel(s.duration)}
+                    </div>
                   </div>
                   <span
                     className={`text-xs font-semibold px-2 py-1 rounded-lg shrink-0

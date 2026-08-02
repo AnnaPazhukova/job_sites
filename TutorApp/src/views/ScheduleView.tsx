@@ -6,6 +6,7 @@ import {
   buildRecurringDates,
   dateKey,
   isLessonPast,
+  lessonLabel,
   lessonPillStyle,
   MONTHS_RU,
   TODAY,
@@ -325,7 +326,7 @@ export function ScheduleView({
                           style={lessonAppearance(item.l).style}
                           className={`w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate font-medium transition ${lessonAppearance(item.l).className}`}
                         >
-                          {item.l.time} · {item.l.title}
+                          {item.l.time} · {lessonLabel(item.l, students)}
                         </button>
                       )
                     )}

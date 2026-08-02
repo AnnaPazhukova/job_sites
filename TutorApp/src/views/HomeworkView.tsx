@@ -113,7 +113,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                 onClick={() => setPresetLesson(l)}
                 className="flex items-center gap-3 px-4 sm:px-5 py-3 cursor-pointer hover:bg-amber-50 transition"
               >
-                {st ? <Avatar id={st.id} name={st.name} size={34} /> : <div className="w-[34px]" />}
+                {st ? <Avatar id={st.id} name={st.name} size={34} color={st.color} /> : <div className="w-[34px]" />}
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{st?.name || l.title}</div>
                   <div className="text-xs text-gray-500">Урок {fmtDateRu(l.date)}</div>
@@ -151,7 +151,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                 onClick={() => setEditingHw(h)}
                 className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap cursor-pointer hover:bg-gray-50 transition"
               >
-                {st ? <Avatar id={st.id} name={st.name} size={38} /> : <div className="w-[38px]" />}
+                {st ? <Avatar id={st.id} name={st.name} size={38} color={st.color} /> : <div className="w-[38px]" />}
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{h.title}</div>
                   <div className="text-xs text-gray-500 truncate">
