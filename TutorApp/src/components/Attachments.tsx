@@ -107,6 +107,40 @@ export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   );
 }
 
+// Full-size, readable view of an attachment — for a dedicated "look at this
+// document" screen, as opposed to AttachmentList's compact gallery tiles.
+function LargeAttachment({ a }: { a: Attachment }) {
+  if (isImage(a)) {
+    return (
+      <a href={a.url} target="_blank" rel="noreferrer" className="block">
+        <img src={a.url} alt={a.name} className="w-full max-h-[70vh] object-contain rounded-xl border border-gray-200 bg-gray-50" />
+      </a>
+    );
+  }
+  if (isPdf(a)) {
+    return (
+      <div>
+        <iframe src={a.url} title={a.name} className="w-full rounded-xl border border-gray-200" style={{ height: "70vh" }} />
+        <a href={a.url} target="_blank" rel="noreferrer" className="text-xs text-[#2563EB] hover:underline mt-1.5 inline-block">
+          Открыть в новой вкладке
+        </a>
+      </div>
+    );
+  }
+  return <FilePill a={a} />;
+}
+
+export function LargeAttachmentList({ attachments }: { attachments: Attachment[] }) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className="space-y-4">
+      {attachments.map((a) => (
+        <LargeAttachment key={a.id} a={a} />
+      ))}
+    </div>
+  );
+}
+
 export function AttachmentsField({ attachments, onChange, label = "Файлы", folder }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);

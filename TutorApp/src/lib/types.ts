@@ -49,6 +49,8 @@ export interface Lesson {
   noteId?: string;
   /** Tutor's plan for the next lesson, set when reviewing this one. */
   nextPlan?: string;
+  /** Record of the lesson — e.g. a photo/PDF of the notes covered. */
+  attachments?: Attachment[];
 }
 
 // assigned: given to the student, not yet turned in.
