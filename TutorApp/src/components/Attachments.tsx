@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FileText, Paperclip, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, FileText, Paperclip, Upload, X } from "lucide-react";
 import { fileStorageEnabled, uploadAttachment } from "../lib/fileStorage";
 import type { Attachment } from "../lib/types";
 
@@ -130,13 +130,78 @@ function LargeAttachment({ a }: { a: Attachment }) {
   return <FilePill a={a} />;
 }
 
+// A swipeable, one-page-at-a-time viewer for multi-page records (e.g. a
+// photographed notebook, several worksheet pages) — native scroll-snap so
+// it swipes smoothly on touch devices with no drag-gesture code of our own.
 export function LargeAttachmentList({ attachments }: { attachments: Attachment[] }) {
+  const [index, setIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    function onScroll() {
+      if (!el) return;
+      setIndex(Math.round(el.scrollLeft / Math.max(el.clientWidth, 1)));
+    }
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  function goTo(i: number) {
+    const el = trackRef.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(attachments.length - 1, i));
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+  }
+
   if (attachments.length === 0) return null;
+  if (attachments.length === 1) return <LargeAttachment a={attachments[0]} />;
+
   return (
-    <div className="space-y-4">
-      {attachments.map((a) => (
-        <LargeAttachment key={a.id} a={a} />
-      ))}
+    <div>
+      <div className="relative">
+        <div ref={trackRef} className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar rounded-xl">
+          {attachments.map((a) => (
+            <div key={a.id} className="w-full shrink-0 snap-center">
+              <LargeAttachment a={a} />
+            </div>
+          ))}
+        </div>
+        {index > 0 && (
+          <button
+            onClick={() => goTo(index - 1)}
+            aria-label="Предыдущая страница"
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 shadow-md border border-gray-200 text-gray-600 hover:bg-white hover:text-[#2563EB] transition"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
+        {index < attachments.length - 1 && (
+          <button
+            onClick={() => goTo(index + 1)}
+            aria-label="Следующая страница"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 shadow-md border border-gray-200 text-gray-600 hover:bg-white hover:text-[#2563EB] transition"
+          >
+            <ChevronRight size={18} />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center justify-center gap-2 mt-2.5">
+        <div className="flex items-center gap-1.5">
+          {attachments.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              aria-label={`Страница ${i + 1}`}
+              className={`rounded-full transition-all ${i === index ? "w-4 h-1.5 bg-[#2563EB]" : "w-1.5 h-1.5 bg-gray-300 hover:bg-gray-400"}`}
+            />
+          ))}
+        </div>
+        <span className="text-xs text-gray-400 tabular-nums">
+          {index + 1} / {attachments.length}
+        </span>
+      </div>
     </div>
   );
 }
