@@ -760,12 +760,7 @@ export function LessonFormModal({
                     placeholder="Что разобрать в следующий раз..."
                   />
                 </Field>
-                <AttachmentsField
-                  attachments={lessonAttachments}
-                  onChange={setLessonAttachments}
-                  label="Запись урока (фото, PDF)"
-                  folder={`lesson-${lesson!.id}`}
-                />
+                <AttachmentsField attachments={lessonAttachments} onChange={setLessonAttachments} label="Запись урока (фото, PDF)" />
               </div>
 
               {lesson!.studentId && (
