@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker, Modal, PrimaryButton, RecurrenceFields, Select, TextArea, TextInput } from "../components/ui";
+import { AttachmentsField } from "../components/Attachments";
 import {
   buildHomeworkAssignment,
   buildRecurringDates,
@@ -37,7 +38,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal } from "./HomeworkView";
-import type { Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, ViewId } from "../lib/types";
+import type { Attachment, Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
 
@@ -603,6 +604,7 @@ export function LessonFormModal({
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending">(lesson?.paymentStatus || "pending");
   const [comment, setComment] = useState(lesson?.comment || "");
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
+  const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
   const [hwText, setHwText] = useState("");
   const [editingHw, setEditingHw] = useState(false);
@@ -641,6 +643,7 @@ export function LessonFormModal({
         paymentStatus,
         comment,
         nextPlan: nextPlan || undefined,
+        attachments: lessonAttachments,
         noteId: noteId || undefined,
       });
     } else {
@@ -757,6 +760,12 @@ export function LessonFormModal({
                     placeholder="Что разобрать в следующий раз..."
                   />
                 </Field>
+                <AttachmentsField
+                  attachments={lessonAttachments}
+                  onChange={setLessonAttachments}
+                  label="Запись урока (фото, PDF)"
+                  folder={`lesson-${lesson!.id}`}
+                />
               </div>
 
               {lesson!.studentId && (

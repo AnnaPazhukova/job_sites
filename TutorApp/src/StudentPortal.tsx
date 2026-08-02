@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
-import { AttachmentList, AttachmentsField } from "./components/Attachments";
-import { fmtDateRu, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
+import { fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -16,6 +16,17 @@ import {
 import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "./lib/types";
 
 type Tab = "schedule" | "messages" | "homework";
+type DetailTab = "record" | "info" | "homework";
+
+// Whatever the student clicked — a homework item, a conducted lesson, or
+// both linked together — opens the same detail view. A lesson's homework
+// is resolved separately since either side can be missing (a lesson with
+// no homework assigned yet, or homework with no linked lesson).
+interface DetailTarget {
+  lesson?: Lesson;
+  homework?: Homework;
+  initialTab: DetailTab;
+}
 
 const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> = {
   assigned: { label: "Не сдано", color: "bg-gray-100 text-gray-500" },
@@ -54,7 +65,7 @@ export default function StudentPortal({ code, onExit }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<"invalid" | "setup" | null>(null);
-  const [openHw, setOpenHw] = useState<Homework | null>(null);
+  const [openDetail, setOpenDetail] = useState<DetailTarget | null>(null);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -110,7 +121,9 @@ export default function StudentPortal({ code, onExit }: Props) {
 
   async function submitHomework(id: string, attachments: Attachment[]) {
     setHomework((hw) => hw.map((h) => (h.id === id ? { ...h, status: "submitted", submissionAttachments: attachments } : h)));
-    setOpenHw((h) => (h && h.id === id ? { ...h, status: "submitted", submissionAttachments: attachments } : h));
+    setOpenDetail((d) =>
+      d && d.homework?.id === id ? { ...d, homework: { ...d.homework, status: "submitted", submissionAttachments: attachments } } : d
+    );
     try {
       await markStudentHomeworkDone(code, id, attachments);
       showToast("Отправлено репетитору на проверку");
@@ -211,7 +224,10 @@ export default function StudentPortal({ code, onExit }: Props) {
                       lessons={lessons}
                       students={profile ? [profile] : []}
                       onDayClick={() => {}}
-                      onLessonClick={() => {}}
+                      onLessonClick={(l) => {
+                        if (l.status === "cancelled" || !isLessonPast(l)) return;
+                        setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
+                      }}
                     />
                   </Card>
                 )}
@@ -232,7 +248,11 @@ export default function StudentPortal({ code, onExit }: Props) {
                       const status = normalizeHomeworkStatus(h.status);
                       const needsAttachment = status === "assigned";
                       return (
-                        <div key={h.id} onClick={() => setOpenHw(h)} className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
+                        <div
+                          key={h.id}
+                          onClick={() => setOpenDetail({ lesson: lesson || undefined, homework: h, initialTab: "homework" })}
+                          className="px-4 sm:px-5 py-4 cursor-pointer hover:bg-gray-50 transition"
+                        >
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="min-w-0">
                               <div className="font-medium text-sm">{h.title}</div>
@@ -288,14 +308,21 @@ export default function StudentPortal({ code, onExit }: Props) {
         )}
       </main>
 
-      {openHw && (
-        <HomeworkDetailModal
+      {openDetail && (
+        <LessonDetailModal
           code={code}
-          homework={openHw}
-          lesson={openHw.lessonId ? lessons.find((l) => l.id === openHw.lessonId) : undefined}
-          note={openHw.noteId ? notes.find((n) => n.id === openHw.noteId) : undefined}
-          onSubmit={submitHomework}
-          onClose={() => setOpenHw(null)}
+          lesson={openDetail.lesson}
+          homework={openDetail.homework}
+          note={
+            openDetail.homework?.noteId
+              ? notes.find((n) => n.id === openDetail.homework!.noteId)
+              : openDetail.lesson?.noteId
+                ? notes.find((n) => n.id === openDetail.lesson!.noteId)
+                : undefined
+          }
+          initialTab={openDetail.initialTab}
+          onSubmitHomework={submitHomework}
+          onClose={() => setOpenDetail(null)}
         />
       )}
 
@@ -309,101 +336,204 @@ export default function StudentPortal({ code, onExit }: Props) {
   );
 }
 
-function HomeworkDetailModal({
+const DETAIL_TAB_META: Record<DetailTab, { label: string }> = {
+  record: { label: "Запись урока" },
+  info: { label: "Информация об уроке" },
+  homework: { label: "ДЗ" },
+};
+
+function LessonDetailModal({
+  code,
+  lesson,
+  homework,
+  note,
+  initialTab,
+  onSubmitHomework,
+  onClose,
+}: {
+  code: string;
+  lesson?: Lesson;
+  homework?: Homework;
+  note?: MethodNote;
+  initialTab: DetailTab;
+  onSubmitHomework: (id: string, attachments: Attachment[]) => void;
+  onClose: () => void;
+}) {
+  const tabs: DetailTab[] = [
+    ...(lesson ? (["record", "info"] as DetailTab[]) : []),
+    ...(homework ? (["homework"] as DetailTab[]) : []),
+  ];
+  const [tab, setTab] = useState<DetailTab>(tabs.includes(initialTab) ? initialTab : tabs[0]);
+
+  const title = homework?.title || (lesson ? `Урок · ${fmtDateRu(lesson.date)}` : "Занятие");
+
+  return (
+    <Modal title={title} onClose={onClose} full>
+      {tabs.length > 1 && (
+        <div className="flex gap-1 mb-4 border-b border-[#F0F1F4] overflow-x-auto -mt-1">
+          {tabs.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3.5 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
+                tab === t ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {DETAIL_TAB_META[t].label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "record" && lesson && <RecordTab lesson={lesson} />}
+      {tab === "info" && lesson && <InfoTab lesson={lesson} note={note} />}
+      {tab === "homework" && homework && <HomeworkTab code={code} homework={homework} onSubmit={onSubmitHomework} onClose={onClose} />}
+    </Modal>
+  );
+}
+
+function RecordTab({ lesson }: { lesson: Lesson }) {
+  if (!lesson.attachments || lesson.attachments.length === 0) {
+    return <div className="py-14 text-center text-gray-400 text-sm">Преподаватель ещё не прикрепил запись урока</div>;
+  }
+  return <LargeAttachmentList attachments={lesson.attachments} />;
+}
+
+function InfoTab({ lesson, note }: { lesson: Lesson; note?: MethodNote }) {
+  const tasks = note?.tabs?.tasks?.trim();
+  const tasksAttachments = note?.attachments?.tasks ?? [];
+  const theory = note?.tabs?.theory?.trim();
+  const theoryAttachments = note?.attachments?.theory ?? [];
+  const rules = note?.tabs?.rules?.trim();
+  const rulesAttachments = note?.attachments?.rules ?? [];
+  const nothing = !lesson.comment && !lesson.nextPlan && !note;
+
+  if (nothing) {
+    return <div className="py-14 text-center text-gray-400 text-sm">Преподаватель пока не заполнил информацию об уроке</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {lesson.comment && (
+        <div className="px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Комментарий преподавателя</div>
+          <div className="text-sm text-gray-700 whitespace-pre-wrap">{lesson.comment}</div>
+        </div>
+      )}
+
+      {lesson.nextPlan && (
+        <div className="px-3.5 py-3 rounded-xl bg-blue-50">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-1">План на следующий урок</div>
+          <div className="text-sm text-gray-700 whitespace-pre-wrap">{lesson.nextPlan}</div>
+        </div>
+      )}
+
+      {note && (
+        <div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-2">
+            <Layers size={15} className="text-gray-400" /> {note.topic}
+          </div>
+          <div className="space-y-3">
+            {(tasks || tasksAttachments.length > 0) && (
+              <div className="px-3.5 py-3 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE]">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Задания</div>
+                {tasks && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{tasks}</div>}
+                {tasksAttachments.length > 0 && <AttachmentList attachments={tasksAttachments} />}
+              </div>
+            )}
+            {(theory || theoryAttachments.length > 0) && (
+              <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1">Теория</div>
+                {theory && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{theory}</div>}
+                {theoryAttachments.length > 0 && <AttachmentList attachments={theoryAttachments} />}
+              </div>
+            )}
+            {(rules || rulesAttachments.length > 0) && (
+              <div className="px-3.5 py-3 rounded-xl bg-amber-50 border border-amber-100">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 mb-1">Правила</div>
+                {rules && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{rules}</div>}
+                {rulesAttachments.length > 0 && <AttachmentList attachments={rulesAttachments} />}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomeworkTab({
   code,
   homework,
-  lesson,
-  note,
   onSubmit,
   onClose,
 }: {
   code: string;
   homework: Homework;
-  lesson?: Lesson;
-  note?: MethodNote;
   onSubmit: (id: string, attachments: Attachment[]) => void;
   onClose: () => void;
 }) {
   const status = normalizeHomeworkStatus(homework.status);
-  const theory = note?.tabs?.theory?.trim();
-  const theoryAttachments = note?.attachments?.theory ?? [];
   const [submissionFiles, setSubmissionFiles] = useState<Attachment[]>(homework.submissionAttachments || []);
 
   return (
-    <Modal title={homework.title} onClose={onClose}>
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
-          <span className="text-xs text-gray-500">{homework.due ? `срок до ${fmtDateRu(homework.due)}` : "без срока"}</span>
-          {homework.grade != null && (
-            <span className="w-7 h-7 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">{homework.grade}</span>
-          )}
-        </div>
-
-        {homework.attachments && homework.attachments.length > 0 && (
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Файлы задания</div>
-            <AttachmentList attachments={homework.attachments} />
-          </div>
-        )}
-
-        {lesson?.comment && (
-          <div className="px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Об уроке</div>
-            <div className="text-sm text-gray-700 whitespace-pre-wrap">{lesson.comment}</div>
-          </div>
-        )}
-
-        {(theory || theoryAttachments.length > 0) && (
-          <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1 flex items-center gap-1">
-              <Layers size={12} /> Теория{note ? ` · ${note.topic}` : ""}
-            </div>
-            {theory && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{theory}</div>}
-            {theoryAttachments.length > 0 && <AttachmentList attachments={theoryAttachments} />}
-          </div>
-        )}
-
-        {homework.reviewComment && (
-          <div className="px-3.5 py-3 rounded-xl bg-blue-50">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-1">Комментарий преподавателя</div>
-            <div className="text-sm text-gray-700 whitespace-pre-wrap">{homework.reviewComment}</div>
-          </div>
-        )}
-
-        {status === "assigned" ? (
-          <div className="border-t border-[#F0F1F4] pt-4 space-y-3">
-            <AttachmentsField
-              attachments={submissionFiles}
-              onChange={setSubmissionFiles}
-              label="Прикрепите фото или файл с выполненным заданием"
-              folder={`portal-${code}`}
-            />
-            <PrimaryButton
-              full
-              icon={Check}
-              disabled={submissionFiles.length === 0}
-              onClick={() => {
-                onSubmit(homework.id, submissionFiles);
-                onClose();
-              }}
-            >
-              Сдать
-            </PrimaryButton>
-            {submissionFiles.length === 0 && (
-              <div className="text-xs text-gray-400 text-center">Чтобы сдать, сначала прикрепите хотя бы один файл</div>
-            )}
-          </div>
-        ) : (
-          submissionFiles.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Ваш ответ</div>
-              <AttachmentList attachments={submissionFiles} />
-            </div>
-          )
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${HW_STATUS_META[status].color}`}>{HW_STATUS_META[status].label}</span>
+        <span className="text-xs text-gray-500">{homework.due ? `срок до ${fmtDateRu(homework.due)}` : "без срока"}</span>
+        {homework.grade != null && (
+          <span className="w-7 h-7 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold">{homework.grade}</span>
         )}
       </div>
-    </Modal>
+
+      <div className="text-sm text-gray-800 whitespace-pre-wrap">{homework.title}</div>
+
+      {homework.attachments && homework.attachments.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Файлы задания</div>
+          <AttachmentList attachments={homework.attachments} />
+        </div>
+      )}
+
+      {homework.reviewComment && (
+        <div className="px-3.5 py-3 rounded-xl bg-blue-50">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-1">Комментарий преподавателя</div>
+          <div className="text-sm text-gray-700 whitespace-pre-wrap">{homework.reviewComment}</div>
+        </div>
+      )}
+
+      {status === "assigned" ? (
+        <div className="border-t border-[#F0F1F4] pt-4 space-y-3">
+          <AttachmentsField
+            attachments={submissionFiles}
+            onChange={setSubmissionFiles}
+            label="Прикрепите фото или файл с выполненным заданием"
+            folder={`portal-${code}`}
+          />
+          <PrimaryButton
+            full
+            icon={Check}
+            disabled={submissionFiles.length === 0}
+            onClick={() => {
+              onSubmit(homework.id, submissionFiles);
+              onClose();
+            }}
+          >
+            Сдать
+          </PrimaryButton>
+          {submissionFiles.length === 0 && (
+            <div className="text-xs text-gray-400 text-center">Чтобы сдать, сначала прикрепите хотя бы один файл</div>
+          )}
+        </div>
+      ) : (
+        submissionFiles.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Ваш ответ</div>
+            <AttachmentList attachments={submissionFiles} />
+          </div>
+        )
+      )}
+    </div>
   );
 }
 
