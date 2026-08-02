@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Paperclip, Upload, X } from "lucide-react";
+import { FileText, Paperclip, Upload, X } from "lucide-react";
 import { fileStorageEnabled, uploadAttachment } from "../lib/fileStorage";
 import type { Attachment } from "../lib/types";
 
@@ -11,6 +11,35 @@ interface Props {
 }
 
 const isImage = (a: Attachment) => a.mimeType?.startsWith("image/");
+const isPdf = (a: Attachment) => a.mimeType === "application/pdf";
+
+function PdfThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      title={a.name}
+      className="group/thumb relative flex flex-col items-center justify-center gap-1 h-24 w-24 rounded-xl overflow-hidden border border-red-200 bg-red-50 shadow-sm hover:shadow hover:bg-red-100 transition px-1.5"
+    >
+      <FileText size={22} className="text-red-500 shrink-0" />
+      <span className="text-[10px] font-semibold text-red-600 truncate w-full text-center">{a.name}</span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/40 text-white opacity-0 group-hover/thumb:opacity-100 hover:bg-black/60 transition"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </a>
+  );
+}
 
 function ImageThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
   return (
@@ -71,7 +100,9 @@ export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   if (attachments.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      {attachments.map((a) => (isImage(a) ? <ImageThumb key={a.id} a={a} /> : <FilePill key={a.id} a={a} />))}
+      {attachments.map((a) =>
+        isImage(a) ? <ImageThumb key={a.id} a={a} /> : isPdf(a) ? <PdfThumb key={a.id} a={a} /> : <FilePill key={a.id} a={a} />
+      )}
     </div>
   );
 }
@@ -106,6 +137,8 @@ export function AttachmentsField({ attachments, onChange, label = "Файлы", 
           {attachments.map((a) =>
             isImage(a) ? (
               <ImageThumb key={a.id} a={a} onRemove={() => remove(a.id)} />
+            ) : isPdf(a) ? (
+              <PdfThumb key={a.id} a={a} onRemove={() => remove(a.id)} />
             ) : (
               <FilePill key={a.id} a={a} onRemove={() => remove(a.id)} />
             )
