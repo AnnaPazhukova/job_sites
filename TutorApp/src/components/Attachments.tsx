@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Paperclip, Upload, X } from "lucide-react";
 import { fileStorageEnabled, uploadAttachment } from "../lib/fileStorage";
+import { getPdfPageCount, renderPdfPageToCanvas } from "../lib/pdfPages";
 import type { Attachment } from "../lib/types";
 
 interface Props {
@@ -107,8 +108,47 @@ export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   );
 }
 
-// Full-size, readable view of an attachment — for a dedicated "look at this
-// document" screen, as opposed to AttachmentList's compact gallery tiles.
+// Renders one PDF page to a plain <canvas>, so once it's on screen it
+// behaves exactly like a photo — pageable in the same swipe gallery, with
+// no reliance on the browser's own (unreliable-on-mobile) PDF embed.
+function PdfPageCanvas({ url, pageNumber, name }: { url: string; pageNumber: number; name: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const widthPx = Math.min((containerRef.current?.clientWidth || 600) * (window.devicePixelRatio || 1), 1600);
+    setFailed(false);
+    renderPdfPageToCanvas(url, pageNumber, canvas, widthPx).catch(() => {
+      if (!cancelled) setFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url, pageNumber]);
+
+  if (failed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-16">
+        <FileText size={28} className="text-gray-300" />
+        <a href={url} target="_blank" rel="noreferrer" className="text-sm text-[#2563EB] hover:underline">
+          Не удалось показать страницу — открыть {name}
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef}>
+      <canvas ref={canvasRef} className="w-full h-auto rounded-xl border border-gray-200 bg-white" />
+    </div>
+  );
+}
+
+// Full-size, readable view of a single non-PDF attachment.
 function LargeAttachment({ a }: { a: Attachment }) {
   if (isImage(a)) {
     return (
@@ -117,54 +157,81 @@ function LargeAttachment({ a }: { a: Attachment }) {
       </a>
     );
   }
-  if (isPdf(a)) {
-    return (
-      <div>
-        <iframe src={a.url} title={a.name} className="w-full rounded-xl border border-gray-200" style={{ height: "70vh" }} />
-        <a href={a.url} target="_blank" rel="noreferrer" className="text-xs text-[#2563EB] hover:underline mt-1.5 inline-block">
-          Открыть в новой вкладке
-        </a>
-      </div>
-    );
-  }
   return <FilePill a={a} />;
 }
 
+type Slide = { key: string; a: Attachment; page?: number };
+
 // A swipeable, one-page-at-a-time viewer for multi-page records (e.g. a
-// photographed notebook, several worksheet pages) — native scroll-snap so
-// it swipes smoothly on touch devices with no drag-gesture code of our own.
+// photographed notebook, several worksheet pages). Every PDF page becomes
+// its own slide — embedding a whole PDF in an iframe doesn't let you scroll
+// or page through it on mobile Safari, so each page is rendered to a
+// canvas instead and paged exactly like a photo. Native scroll-snap makes
+// touch swiping work with no drag-gesture code of our own.
 export function LargeAttachmentList({ attachments }: { attachments: Attachment[] }) {
   const [index, setIndex] = useState(0);
+  const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
   const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    for (const a of attachments) {
+      if (!isPdf(a)) continue;
+      getPdfPageCount(a.url)
+        .then((n) => {
+          if (!cancelled) setPageCounts((prev) => (prev[a.id] === n ? prev : { ...prev, [a.id]: n }));
+        })
+        .catch(() => {
+          if (!cancelled) setPageCounts((prev) => (prev[a.id] ? prev : { ...prev, [a.id]: 1 }));
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.map((a) => a.id).join(",")]);
+
+  const slides: Slide[] = [];
+  for (const a of attachments) {
+    if (isPdf(a)) {
+      const count = pageCounts[a.id] ?? 1;
+      for (let p = 1; p <= count; p++) slides.push({ key: `${a.id}-p${p}`, a, page: p });
+    } else {
+      slides.push({ key: a.id, a });
+    }
+  }
+
+  useEffect(() => {
+    if (index > slides.length - 1) setIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slides.length]);
+
+  function onScroll() {
     const el = trackRef.current;
     if (!el) return;
-    function onScroll() {
-      if (!el) return;
-      setIndex(Math.round(el.scrollLeft / Math.max(el.clientWidth, 1)));
-    }
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+    setIndex(Math.round(el.scrollLeft / Math.max(el.clientWidth, 1)));
+  }
 
   function goTo(i: number) {
     const el = trackRef.current;
     if (!el) return;
-    const clamped = Math.max(0, Math.min(attachments.length - 1, i));
+    const clamped = Math.max(0, Math.min(slides.length - 1, i));
     el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
   }
 
-  if (attachments.length === 0) return null;
-  if (attachments.length === 1) return <LargeAttachment a={attachments[0]} />;
+  if (slides.length === 0) return null;
+  if (slides.length === 1) {
+    const s = slides[0];
+    return s.page ? <PdfPageCanvas url={s.a.url} pageNumber={s.page} name={s.a.name} /> : <LargeAttachment a={s.a} />;
+  }
 
   return (
     <div>
       <div className="relative">
-        <div ref={trackRef} className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar rounded-xl">
-          {attachments.map((a) => (
-            <div key={a.id} className="w-full shrink-0 snap-center">
-              <LargeAttachment a={a} />
+        <div ref={trackRef} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar rounded-xl">
+          {slides.map((s) => (
+            <div key={s.key} className="w-full shrink-0 snap-center">
+              {s.page ? <PdfPageCanvas url={s.a.url} pageNumber={s.page} name={s.a.name} /> : <LargeAttachment a={s.a} />}
             </div>
           ))}
         </div>
@@ -177,7 +244,7 @@ export function LargeAttachmentList({ attachments }: { attachments: Attachment[]
             <ChevronLeft size={18} />
           </button>
         )}
-        {index < attachments.length - 1 && (
+        {index < slides.length - 1 && (
           <button
             onClick={() => goTo(index + 1)}
             aria-label="Следующая страница"
@@ -189,9 +256,9 @@ export function LargeAttachmentList({ attachments }: { attachments: Attachment[]
       </div>
       <div className="flex items-center justify-center gap-2 mt-2.5">
         <div className="flex items-center gap-1.5">
-          {attachments.map((_, i) => (
+          {slides.map((s, i) => (
             <button
-              key={i}
+              key={s.key}
               onClick={() => goTo(i)}
               aria-label={`Страница ${i + 1}`}
               className={`rounded-full transition-all ${i === index ? "w-4 h-1.5 bg-[#2563EB]" : "w-1.5 h-1.5 bg-gray-300 hover:bg-gray-400"}`}
@@ -199,7 +266,7 @@ export function LargeAttachmentList({ attachments }: { attachments: Attachment[]
           ))}
         </div>
         <span className="text-xs text-gray-400 tabular-nums">
-          {index + 1} / {attachments.length}
+          {index + 1} / {slides.length}
         </span>
       </div>
     </div>
