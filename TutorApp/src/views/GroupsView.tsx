@@ -63,7 +63,7 @@ export function GroupsView({ groups, setGroups, students, showToast }: Props) {
                   const st = students.find((s) => s.id === mid);
                   return st ? (
                     <div key={mid} className="ring-2 ring-white rounded-full">
-                      <Avatar id={st.id} name={st.name} size={32} />
+                      <Avatar id={st.id} name={st.name} size={32} color={st.color} />
                     </div>
                   ) : null;
                 })}

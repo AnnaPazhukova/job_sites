@@ -52,7 +52,7 @@ export function StudentBalances({ students, setStudents, lessons }: Props) {
           {filtered.map(({ student, balance }) => (
             <Card key={student.id} className="p-4">
               <div className="flex items-center gap-2.5 mb-3">
-                <Avatar id={student.id} name={student.name} size={36} />
+                <Avatar id={student.id} name={student.name} size={36} color={student.color} />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{student.name}</div>
                 </div>

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { dateKey, isLessonPast, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
+import { dateKey, isLessonPast, lessonLabel, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
@@ -136,7 +136,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                         )}
                         {l.time}–{addMinutes(l.time, l.duration)}
                       </div>
-                      <div className="truncate">{l.title}</div>
+                      <div className="truncate">{lessonLabel(l, students)}</div>
                     </button>
                   </Fragment>
                 );

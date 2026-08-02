@@ -1,4 +1,4 @@
-import type { ChatMessage, Homework, HomeworkStatus, Lesson } from "./types";
+import type { ChatMessage, Homework, HomeworkStatus, Lesson, Student } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -45,6 +45,15 @@ export function durationLabel(minutes: number) {
 export function lessonPillStyle(color: string | null | undefined, past = false): { background: string; color: string } | undefined {
   if (!color) return undefined;
   return { background: color + (past ? "40" : "1A"), color };
+}
+
+// What to show on a lesson pill in the calendar — the student's name plus
+// their grade, so a tutor scanning the week can tell classes apart without
+// opening each lesson. Group lessons and lessons for students without a
+// grade on file just fall back to the lesson's own title.
+export function lessonLabel(lesson: Lesson, students: Student[]): string {
+  const student = lesson.studentId ? students.find((s) => s.id === lesson.studentId) : undefined;
+  return student?.grade ? `${lesson.title} · ${student.grade}` : lesson.title;
 }
 
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];

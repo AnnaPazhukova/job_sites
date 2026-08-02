@@ -59,7 +59,7 @@ export function MessagesView({ students, messages, setMessages }: Props) {
                 onClick={() => setActiveId(s.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-[#F7F8FA] hover:bg-[#FAFBFC] ${activeId === s.id ? "bg-[#EEF2FF]" : ""}`}
               >
-                <Avatar id={s.id} name={s.name} size={36} />
+                <Avatar id={s.id} name={s.name} size={36} color={s.color} />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{s.name}</div>
                   <div className="text-xs text-gray-400 truncate">
@@ -72,7 +72,7 @@ export function MessagesView({ students, messages, setMessages }: Props) {
         </div>
         <div className="flex flex-col">
           <div className="px-4 py-3 border-b border-[#F0F1F4] font-semibold text-sm flex items-center gap-2">
-            {activeStudent && <Avatar id={activeStudent.id} name={activeStudent.name} size={28} />}
+            {activeStudent && <Avatar id={activeStudent.id} name={activeStudent.name} size={28} color={activeStudent.color} />}
             {activeStudent?.name}
           </div>
           <div className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 340 }}>
