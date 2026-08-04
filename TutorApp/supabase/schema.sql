@@ -86,15 +86,33 @@ create policy "tutor manages own invites" on public.student_invites
 -- Lets a student (no Supabase Auth session — see the comment above) upload
 -- attachments too: their folder is "portal-<code>" instead of auth.uid(),
 -- authorized by the code existing in student_invites rather than identity.
+--
+-- The code lookup has to go through a SECURITY DEFINER function rather than
+-- a plain `exists (select ... from student_invites)` inside the policy: a
+-- storage.objects RLS check runs as the calling role (anon here), so a raw
+-- subquery would itself be filtered by student_invites' own RLS policy
+-- ("tutor manages own invites", auth.uid() = tutor_id) — which anon never
+-- satisfies, silently rejecting every upload with a code that's perfectly
+-- valid. The function bypasses that by running as its (table-owning)
+-- definer, same as the portal_* functions below, and only ever returns a
+-- boolean — no row data leaks out.
+create or replace function public.portal_code_exists(p_code text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.student_invites where code = p_code);
+$$;
+
+grant execute on function public.portal_code_exists(text) to anon, authenticated;
+
 drop policy if exists "portal upload own attachments" on storage.objects;
 create policy "portal upload own attachments" on storage.objects
   for insert with check (
     bucket_id = 'attachments'
     and (storage.foldername(name))[1] like 'portal-%'
-    and exists (
-      select 1 from public.student_invites
-      where code = substring((storage.foldername(name))[1] from 8)
-    )
+    and public.portal_code_exists(substring((storage.foldername(name))[1] from 8))
   );
 
 -- Returns just the link code's own slice of a given data key ('students',

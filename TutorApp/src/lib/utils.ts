@@ -51,9 +51,16 @@ export function lessonPillStyle(color: string | null | undefined, past = false):
 // their grade, so a tutor scanning the week can tell classes apart without
 // opening each lesson. Group lessons and lessons for students without a
 // grade on file just fall back to the lesson's own title.
+//
+// `lesson.title` is a one-time snapshot of the student's name taken when
+// the lesson was created, not a live reference — so it goes stale if the
+// student is later renamed. Prefer the current name from `students` and
+// only fall back to the stored title (group lessons, or a student that's
+// since been deleted).
 export function lessonLabel(lesson: Lesson, students: Student[]): string {
   const student = lesson.studentId ? students.find((s) => s.id === lesson.studentId) : undefined;
-  return student?.grade ? `${lesson.title} · ${student.grade}` : lesson.title;
+  const name = student?.name || lesson.title;
+  return student?.grade ? `${name} · ${student.grade}` : name;
 }
 
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
