@@ -151,6 +151,11 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
+  function moveLesson(lesson: Lesson, date: string, time: string) {
+    setLessons(lessons.map((l) => (l.id === lesson.id ? { ...l, date, time } : l)));
+    showToast("Занятие перенесено");
+  }
+
   function handleAssignHomework(title: string, noteId?: string) {
     if (!editLesson || !editLesson.studentId) return;
     const st = students.find((s) => s.id === editLesson.studentId);
@@ -339,7 +344,15 @@ export function ScheduleView({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <WeekView cursor={cursor} lessons={lessons} students={students} gcalEvents={gcal.events} onDayClick={openAdd} onLessonClick={setEditLesson} />
+          <WeekView
+            cursor={cursor}
+            lessons={lessons}
+            students={students}
+            gcalEvents={gcal.events}
+            onDayClick={openAdd}
+            onLessonClick={setEditLesson}
+            onLessonMove={moveLesson}
+          />
         </Card>
       )}
 
