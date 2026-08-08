@@ -387,8 +387,18 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                       onPointerMove={draggable ? movePress : undefined}
                       onPointerUp={draggable ? endPress : undefined}
                       onPointerCancel={draggable ? cancelPress : undefined}
-                      style={{ ...style, ...appearance.style, touchAction: beingDragged ? "none" : undefined, opacity: beingDragged ? 0.35 : undefined }}
-                      className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className} ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
+                      style={{
+                        ...style,
+                        ...appearance.style,
+                        touchAction: beingDragged ? "none" : undefined,
+                        opacity: beingDragged ? 0.35 : undefined,
+                        // A long-press is how drag starts on touch — without these, the
+                        // browser's own long-press handling (text selection, iOS's
+                        // copy/lookup callout) fires first and eats the gesture.
+                        WebkitTouchCallout: draggable ? "none" : undefined,
+                        WebkitUserSelect: draggable ? "none" : undefined,
+                      }}
+                      className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className} ${draggable ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
                     >
                       <div className="flex items-center gap-1">
                         {hasCustomColor && l.status !== "cancelled" && (
