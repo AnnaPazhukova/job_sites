@@ -47,6 +47,7 @@ const GRID_MAX_HEIGHT = 620;
 const DRAG_SNAP_MIN = 5;
 const PRESS_HOLD_MS = 350;
 const PRESS_MOVE_CANCEL_PX = 8;
+const MOUSE_DRAG_MOVE_PX = 4;
 
 // Google-Calendar-style side-by-side layout for events that overlap in
 // time: each item gets a column index and the total column count for the
@@ -87,14 +88,19 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
   const dayColRefs = useRef<(HTMLDivElement | null)[]>([]);
   const draggable = Boolean(onLessonMove);
 
-  // Press-and-hold to reschedule: a plain tap still opens the lesson, but
-  // holding still for PRESS_HOLD_MS arms drag mode, after which moving the
-  // pointer repositions the lesson to a new day/time on release. Movement
-  // before the hold timer fires cancels it (lets normal scrolling through
-  // it, rather than mistaking a scroll/swipe for a long-press).
-  const pressRef = useRef<{ pointerId: number; lesson: Lesson; startX: number; startY: number; timer: ReturnType<typeof setTimeout> } | null>(
-    null
-  );
+  // Press-and-hold to reschedule: a plain tap still opens the lesson. On
+  // touch/pen, holding still for PRESS_HOLD_MS arms drag mode (movement
+  // before then cancels it, so a scroll/swipe isn't mistaken for a
+  // long-press); on mouse there's no scroll to confuse it with, so drag
+  // arms as soon as the press moves — see movePress/armDrag.
+  const pressRef = useRef<{
+    pointerId: number;
+    lesson: Lesson;
+    startX: number;
+    startY: number;
+    el: HTMLElement;
+    timer?: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const [drag, setDrag] = useState<{ lesson: Lesson; pointerId: number; dayIndex: number; minutes: number } | null>(null);
 
   useEffect(() => {
@@ -107,7 +113,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
   useEffect(
     () => () => {
-      if (pressRef.current) clearTimeout(pressRef.current.timer);
+      if (pressRef.current?.timer) clearTimeout(pressRef.current.timer);
     },
     []
   );
@@ -181,18 +187,27 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
     return { dayIndex, minutes };
   }
 
+  function armDrag(lesson: Lesson, pointerId: number, el: HTMLElement, clientX: number, clientY: number) {
+    pressRef.current = null;
+    el.setPointerCapture(pointerId);
+    setDrag({ lesson, pointerId, ...computeDragTarget(clientX, clientY) });
+  }
+
   function startPress(e: React.PointerEvent<HTMLButtonElement>, lesson: Lesson) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.stopPropagation();
-    if (pressRef.current) clearTimeout(pressRef.current.timer);
-    const { clientX: startX, clientY: startY, pointerId } = e;
+    if (pressRef.current?.timer) clearTimeout(pressRef.current.timer);
+    const { clientX: startX, clientY: startY, pointerId, pointerType } = e;
     const el = e.currentTarget;
-    const timer = setTimeout(() => {
-      pressRef.current = null;
-      el.setPointerCapture(pointerId);
-      setDrag({ lesson, pointerId, ...computeDragTarget(startX, startY) });
-    }, PRESS_HOLD_MS);
-    pressRef.current = { pointerId, lesson, startX, startY, timer };
+    const press: NonNullable<typeof pressRef.current> = { pointerId, lesson, startX, startY, el };
+    // Touch/pen needs a brief hold before drag arms, so a quick swipe to
+    // scroll the grid isn't mistaken for picking up the lesson. A mouse
+    // press has no such conflict — dragging can arm as soon as it moves
+    // (see movePress), matching the ordinary press-and-drag desktop gesture.
+    if (pointerType !== "mouse") {
+      press.timer = setTimeout(() => armDrag(lesson, pointerId, el, startX, startY), PRESS_HOLD_MS);
+    }
+    pressRef.current = press;
   }
 
   function movePress(e: React.PointerEvent<HTMLButtonElement>) {
@@ -202,8 +217,12 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
       return;
     }
     const press = pressRef.current;
-    if (press && press.pointerId === e.pointerId && Math.hypot(e.clientX - press.startX, e.clientY - press.startY) > PRESS_MOVE_CANCEL_PX) {
-      clearTimeout(press.timer);
+    if (!press || press.pointerId !== e.pointerId) return;
+    const dist = Math.hypot(e.clientX - press.startX, e.clientY - press.startY);
+    if (e.pointerType === "mouse") {
+      if (dist > MOUSE_DRAG_MOVE_PX) armDrag(press.lesson, press.pointerId, press.el, e.clientX, e.clientY);
+    } else if (dist > PRESS_MOVE_CANCEL_PX) {
+      if (press.timer) clearTimeout(press.timer);
       pressRef.current = null;
     }
   }
@@ -211,7 +230,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
   function endPress(e: React.PointerEvent<HTMLButtonElement>) {
     const press = pressRef.current;
     if (press && press.pointerId === e.pointerId) {
-      clearTimeout(press.timer);
+      if (press.timer) clearTimeout(press.timer);
       pressRef.current = null;
       onLessonClick(press.lesson);
       return;
@@ -227,7 +246,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
   function cancelPress(e: React.PointerEvent<HTMLButtonElement>) {
     if (pressRef.current?.pointerId === e.pointerId) {
-      clearTimeout(pressRef.current.timer);
+      if (pressRef.current.timer) clearTimeout(pressRef.current.timer);
       pressRef.current = null;
     }
     if (drag?.pointerId === e.pointerId) setDrag(null);
