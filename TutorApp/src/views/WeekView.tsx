@@ -390,7 +390,15 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                       style={{
                         ...style,
                         ...appearance.style,
-                        touchAction: beingDragged ? "none" : undefined,
+                        // Has to be "none" from the very first touch, not just once drag
+                        // arms: the browser starts deciding "is this a scroll?" on the
+                        // first sub-pixel move, and with the default touch-action it can
+                        // win that race and fire pointercancel before our own hold-timer
+                        // (or its own 8px-move threshold) ever gets a say. Losing the
+                        // ability to start a page-scroll with a finger placed exactly on
+                        // a lesson chip is an acceptable trade — same as every other
+                        // touch calendar.
+                        touchAction: draggable ? "none" : undefined,
                         opacity: beingDragged ? 0.35 : undefined,
                         // A long-press is how drag starts on touch — without these, the
                         // browser's own long-press handling (text selection, iOS's
