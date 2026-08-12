@@ -1,6 +1,6 @@
 import { AlertCircle, BookOpen, Calendar as CalendarIcon, ChevronRight, CheckCircle2, Clock, Layers, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { Card, PageHeader } from "../components/ui";
-import { fmtMoney, sumPrice, TODAY, TODAY_KEY, dateKey } from "../lib/utils";
+import { fmtMoney, isLessonPast, sumPrice, TODAY, TODAY_KEY, dateKey } from "../lib/utils";
 import type { Homework, Lesson, MethodNote, Student, Task, ViewId } from "../lib/types";
 
 interface Props {
@@ -31,9 +31,12 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
     return students.filter((s) => s.joinedAt && s.joinedAt <= key).length;
   });
 
-  const paidPast = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && l.date <= TODAY_KEY));
-  const paidAdvance = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && l.date > TODAY_KEY));
-  const debt = sumPrice(activeLessons.filter((l) => l.paymentStatus !== "paid" && l.date <= TODAY_KEY));
+  // isLessonPast (end-of-lesson time), not just the calendar date, so a
+  // lesson later today isn't already counted as received/owed before it's
+  // even happened.
+  const paidPast = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && isLessonPast(l)));
+  const paidAdvance = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && !isLessonPast(l)));
+  const debt = sumPrice(activeLessons.filter((l) => l.paymentStatus !== "paid" && isLessonPast(l)));
   const monthEnd = dateKey(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0));
   const monthForecast = sumPrice(activeLessons.filter((l) => l.date > TODAY_KEY && l.date <= monthEnd));
 

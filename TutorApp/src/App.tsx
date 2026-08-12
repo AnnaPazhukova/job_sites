@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useStore } from "./lib/storage";
-import { TODAY_KEY } from "./lib/utils";
+import { isLessonPast } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId, WeeklyTemplateSlot } from "./lib/types";
 
@@ -81,7 +81,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   }, [seedFlagsLoaded]);
 
   const pendingHw = homework.filter((h) => h.status === "submitted").length;
-  const dueUnpaid = lessons.filter((l) => l.status !== "cancelled" && l.paymentStatus !== "paid" && l.date <= TODAY_KEY).length;
+  const dueUnpaid = lessons.filter((l) => l.status !== "cancelled" && l.paymentStatus !== "paid" && isLessonPast(l)).length;
 
   function handleBellClick() {
     const total = pendingHw + dueUnpaid;
