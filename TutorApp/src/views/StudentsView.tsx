@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Calendar as CalendarIcon, Mail, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
 import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, Select, TextInput } from "../components/ui";
-import { durationLabel, fmtMoney, GRADES, TODAY_KEY, uid } from "../lib/utils";
+import { durationLabel, fmtMoney, GRADES, isLessonPast, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
 
-// Positive balance = prepaid credit (paid lessons still in the future).
-// Negative balance = debt (past/today lessons that were never marked paid).
+// Positive balance = prepaid credit (paid lessons that haven't happened yet).
+// Negative balance = debt (lessons already held that were never marked paid).
+// Uses isLessonPast (end-of-lesson time, not just the calendar date) so a
+// lesson later today doesn't count as debt/credit before it's even started.
 export function studentBalance(lessons: Lesson[], studentId: string) {
   const own = lessons.filter((l) => l.studentId === studentId && l.status !== "cancelled");
   const advance = own
-    .filter((l) => l.paymentStatus === "paid" && l.date > TODAY_KEY)
+    .filter((l) => l.paymentStatus === "paid" && !isLessonPast(l))
     .reduce((s, l) => s + (Number(l.price) || 0), 0);
   const debt = own
-    .filter((l) => l.paymentStatus !== "paid" && l.date <= TODAY_KEY)
+    .filter((l) => l.paymentStatus !== "paid" && isLessonPast(l))
     .reduce((s, l) => s + (Number(l.price) || 0), 0);
   return advance - debt;
 }
