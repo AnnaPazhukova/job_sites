@@ -475,12 +475,14 @@ export function StudentDetailPage({
                     >
                       <Clock size={13} /> {l.status === "cancelled" ? "Отменено" : held ? "Проведено" : "Запланировано"}
                     </span>
-                    <span
-                      className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
-                      ${l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}
-                    >
-                      <Wallet size={13} /> {l.paymentStatus === "paid" ? "Оплачено" : "Ожидает оплаты"}
-                    </span>
+                    {l.status !== "cancelled" && (
+                      <span
+                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
+                        ${l.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}
+                      >
+                        <Wallet size={13} /> {l.paymentStatus === "paid" ? "Оплачено" : "Ожидает оплаты"}
+                      </span>
+                    )}
                     <button
                       onClick={() => (l.status === "cancelled" ? null : cancelLesson(l.id))}
                       disabled={l.status === "cancelled"}
@@ -630,6 +632,7 @@ export function LessonFormModal({
   const [untilDate, setUntilDate] = useState("");
 
   const isPast = isEdit && isLessonPast(lesson!);
+  const isCancelled = lesson?.status === "cancelled";
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
@@ -700,6 +703,11 @@ export function LessonFormModal({
         <div className="flex items-center gap-2 mb-5 flex-wrap">
           {isPast ? (
             <>
+              {isCancelled && (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-400">
+                  <Clock size={15} /> Отменено
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600">
                 <User size={15} /> {studentName}
               </span>
@@ -708,19 +716,26 @@ export function LessonFormModal({
               </span>
             </>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-blue-50 text-[#2563EB]">
-              <Clock size={15} /> Запланировано
+            <span
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl ${
+                isCancelled ? "bg-gray-100 text-gray-400" : "bg-blue-50 text-[#2563EB]"
+              }`}
+            >
+              <Clock size={15} /> {isCancelled ? "Отменено" : "Запланировано"}
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => setPaymentStatus((p) => (p === "paid" ? "pending" : "paid"))}
-            className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl border transition
-              ${paymentStatus === "paid" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-600"}`}
-          >
-            {paymentStatus === "paid" ? <Check size={15} /> : <Wallet size={15} />}
-            {paymentStatus === "paid" ? "Оплачено" : "Отметить оплату"}
-          </button>
+          {/* A cancelled lesson isn't billed, so payment status doesn't apply — see studentBalance() in StudentsView. */}
+          {!isCancelled && (
+            <button
+              type="button"
+              onClick={() => setPaymentStatus((p) => (p === "paid" ? "pending" : "paid"))}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl border transition
+                ${paymentStatus === "paid" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-600"}`}
+            >
+              {paymentStatus === "paid" ? <Check size={15} /> : <Wallet size={15} />}
+              {paymentStatus === "paid" ? "Оплачено" : "Отметить оплату"}
+            </button>
+          )}
         </div>
       )}
 
