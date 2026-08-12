@@ -151,9 +151,10 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
-  function moveLesson(lesson: Lesson, date: string, time: string) {
-    setLessons(lessons.map((l) => (l.id === lesson.id ? { ...l, date, time } : l)));
+  function moveLesson(id: string, date: string, time: string) {
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, date, time } : l)));
     showToast("Занятие перенесено");
+    setEditLesson(null);
   }
 
   function handleAssignHomework(title: string, noteId?: string) {
@@ -351,7 +352,6 @@ export function ScheduleView({
             gcalEvents={gcal.events}
             onDayClick={openAdd}
             onLessonClick={setEditLesson}
-            onLessonMove={moveLesson}
           />
         </Card>
       )}
@@ -374,6 +374,7 @@ export function ScheduleView({
           onClose={() => setEditLesson(null)}
           onSave={saveLessonEdit}
           onCancelLesson={() => cancelLessonEdit(editLesson.id)}
+          onMoveLesson={(date, time) => moveLesson(editLesson.id, date, time)}
         />
       )}
 
