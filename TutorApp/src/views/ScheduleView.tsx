@@ -1,5 +1,17 @@
-import { useMemo, useState } from "react";
-import { Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Calendar as CalendarIcon,
+  CalendarClock,
+  CalendarPlus,
+  CalendarCheck2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Plus,
+  RefreshCw,
+  Wallet,
+  X,
+} from "lucide-react";
 import { Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
   buildHomeworkAssignment,
@@ -17,13 +29,16 @@ import {
 } from "../lib/utils";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, WeeklyTemplateSlot } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
-import { useGoogleCalendar } from "../lib/useGoogleCalendar";
+import { useGoogleCalendar, type GcalSyncSettings } from "../lib/useGoogleCalendar";
+import { runGcalSync } from "../lib/gcalSync";
 import { LessonFormModal } from "./StudentDetailView";
 import { StudentBalances } from "./StudentBalances";
 import { WeekView, getWeekDays } from "./WeekView";
 import { WeeklyTemplateModal } from "./WeeklyTemplateModal";
 
 type DayItem = { kind: "gcal"; e: GcalEvent } | { kind: "lesson"; l: Lesson };
+
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 interface Props {
   lessons: Lesson[];
@@ -39,6 +54,8 @@ interface Props {
   setMessages: (m: MessagesByStudent) => void;
   notes: MethodNote[];
   showToast: (t: string) => void;
+  gcalSyncSettings: GcalSyncSettings;
+  setGcalSyncSettings: (s: GcalSyncSettings) => void;
 }
 
 export function ScheduleView({
@@ -55,6 +72,8 @@ export function ScheduleView({
   setMessages,
   notes,
   showToast,
+  gcalSyncSettings,
+  setGcalSyncSettings,
 }: Props) {
   const [mode, setMode] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState(TODAY);
@@ -99,7 +118,65 @@ export function ScheduleView({
     return d.toISOString();
   }, [mode, cells, cursor]);
 
-  const gcal = useGoogleCalendar(rangeStartISO, rangeEndISO);
+  const gcal = useGoogleCalendar(rangeStartISO, rangeEndISO, gcalSyncSettings.calendarId);
+  const [syncing, setSyncing] = useState(false);
+  const lessonsRef = useRef(lessons);
+  lessonsRef.current = lessons;
+  const studentsRef = useRef(students);
+  studentsRef.current = students;
+
+  function selectSyncCalendar(id: string) {
+    const cal = gcal.calendars.find((c) => c.id === id);
+    setGcalSyncSettings(cal ? { calendarId: cal.id, calendarName: cal.summary, timeZone: cal.timeZone } : { calendarId: null, calendarName: null, timeZone: null });
+  }
+
+  // Creates lessons from new events on the chosen calendar, and creates
+  // events for new lessons — see gcalSync.ts for what "sync" covers (only
+  // creation, nothing is ever edited/deleted on either side). `interactive`
+  // controls whether "nothing changed" / errors get their own toast, so the
+  // background auto-sync below doesn't nag every 5 minutes.
+  async function runSync(interactive: boolean) {
+    if (!gcalSyncSettings.calendarId || syncing) return;
+    setSyncing(true);
+    try {
+      const token = await gcal.getToken();
+      if (!token) {
+        if (interactive) showToast("Не удалось подключиться к Google Calendar — переподключите его");
+        return;
+      }
+      const result = await runGcalSync({
+        token,
+        calendarId: gcalSyncSettings.calendarId,
+        timeZone: gcalSyncSettings.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        lessons: lessonsRef.current,
+        students: studentsRef.current,
+      });
+      if (result.imported > 0 || result.exported > 0) {
+        setLessons(result.lessons);
+        const parts: string[] = [];
+        if (result.imported > 0) parts.push(`импортировано занятий: ${result.imported}`);
+        if (result.exported > 0) parts.push(`добавлено в календарь: ${result.exported}`);
+        showToast(`Синхронизация: ${parts.join(", ")}`);
+      } else if (interactive) {
+        showToast("Всё синхронизировано");
+      }
+    } catch (e) {
+      if (interactive) showToast(e instanceof Error ? e.message : "Ошибка синхронизации с Google Calendar");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Auto-sync while this page is open: once as soon as a calendar is
+  // chosen, then every few minutes for as long as the tab stays open —
+  // there's no backend here to sync in the background otherwise.
+  useEffect(() => {
+    if (!gcal.connected || !gcalSyncSettings.calendarId) return;
+    void runSync(false);
+    const id = setInterval(() => void runSync(false), AUTO_SYNC_INTERVAL_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gcal.connected, gcalSyncSettings.calendarId]);
 
   function itemsOn(d: Date): DayItem[] {
     const key = dateKey(d);
@@ -259,12 +336,38 @@ export function ScheduleView({
             )}
             {gcal.enabled &&
               (gcal.connected ? (
-                <div className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
-                  <CalendarCheck2 size={15} /> Google Calendar
-                  <button onClick={gcal.disconnect} className="p-0.5 rounded-full hover:bg-emerald-100 text-emerald-600" title="Отключить">
-                    <X size={13} />
-                  </button>
-                </div>
+                <>
+                  <div className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
+                    <CalendarCheck2 size={15} /> Google Calendar
+                    <button onClick={gcal.disconnect} className="p-0.5 rounded-full hover:bg-emerald-100 text-emerald-600" title="Отключить">
+                      <X size={13} />
+                    </button>
+                  </div>
+                  {gcal.calendars.length > 0 && (
+                    <select
+                      value={gcalSyncSettings.calendarId || ""}
+                      onChange={(e) => selectSyncCalendar(e.target.value)}
+                      title="Календарь для синхронизации"
+                      className="px-3 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium max-w-[180px]"
+                    >
+                      <option value="">Основной календарь</option>
+                      {gcal.calendars.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {gcalSyncSettings.calendarId && (
+                    <button
+                      onClick={() => runSync(true)}
+                      disabled={syncing}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition disabled:opacity-50"
+                    >
+                      <RefreshCw size={15} className={syncing ? "animate-spin" : ""} /> {syncing ? "Синхронизация..." : "Синхронизировать сейчас"}
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   onClick={gcal.connect}

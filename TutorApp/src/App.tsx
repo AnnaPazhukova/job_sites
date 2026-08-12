@@ -14,6 +14,7 @@ import {
 import { useStore } from "./lib/storage";
 import { isLessonPast } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
+import type { GcalSyncSettings } from "./lib/useGoogleCalendar";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId, WeeklyTemplateSlot } from "./lib/types";
 
 import { StudentsView } from "./views/StudentsView";
@@ -56,6 +57,11 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   const [tasks, saveTasks] = useStore<Task[]>("tasks", []);
   const [notes, saveNotes] = useStore<MethodNote[]>("methodology-notes", []);
   const [seedFlags, saveSeedFlags, seedFlagsLoaded] = useStore<Record<string, boolean>>("seed-flags", {});
+  const [gcalSyncSettings, setGcalSyncSettings] = useStore<GcalSyncSettings>("gcal-sync-settings", {
+    calendarId: null,
+    calendarName: null,
+    timeZone: null,
+  });
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -215,6 +221,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   setMessages={setMessages}
                   notes={notes}
                   showToast={showToast}
+                  gcalSyncSettings={gcalSyncSettings}
+                  setGcalSyncSettings={setGcalSyncSettings}
                 />
               )}
               {view === "messages" && <MessagesView students={students} messages={messages} setMessages={setMessages} />}

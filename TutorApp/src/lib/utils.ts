@@ -63,6 +63,34 @@ export function lessonLabel(lesson: Lesson, students: Student[]): string {
   return student?.grade ? `${name} · ${student.grade}` : name;
 }
 
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/ё/g, "е").trim();
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Matches a Google Calendar event's free-text title to a student, for
+// importing calendar events as lessons (see gcalSync.ts). The title has no
+// structured "student" field — only whatever the tutor typed, e.g. "Дарина
+// 9 класс" or "Дарина". If the name alone identifies exactly one student,
+// that's enough; if several students share that name, the grade (as a
+// whole word, so grade "9" doesn't match inside "19") has to disambiguate.
+// Returns undefined rather than guess when it's still ambiguous — the
+// caller creates an unlinked lesson instead of risking a wrong match.
+export function matchStudentByNameAndGrade(eventTitle: string, students: Student[]): Student | undefined {
+  const title = normalizeForMatch(eventTitle);
+  const nameMatches = students.filter((s) => {
+    const name = s.firstName || s.name;
+    return name && title.includes(normalizeForMatch(name));
+  });
+  if (nameMatches.length === 1) return nameMatches[0];
+  if (nameMatches.length === 0) return undefined;
+  const gradeMatches = nameMatches.filter((s) => s.grade && new RegExp(`\\b${escapeRegExp(normalizeForMatch(s.grade))}\\b`).test(title));
+  return gradeMatches.length === 1 ? gradeMatches[0] : undefined;
+}
+
 const AVATAR_COLORS = ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
 
 export function colorFor(id: string) {
