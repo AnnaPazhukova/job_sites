@@ -4,6 +4,7 @@ import {
   BookOpen,
   Cake,
   Calendar as CalendarIcon,
+  CalendarClock,
   Check,
   ChevronLeft,
   Clock,
@@ -192,6 +193,13 @@ export function StudentDetailPage({
   function cancelLesson(id: string) {
     setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)));
     showToast("Занятие отменено");
+    setShowLessonForm(false);
+    setEditLesson(null);
+  }
+
+  function moveLesson(id: string, date: string, time: string) {
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, date, time } : l)));
+    showToast("Занятие перенесено");
     setShowLessonForm(false);
     setEditLesson(null);
   }
@@ -540,6 +548,7 @@ export function StudentDetailPage({
           }}
           onSave={saveLesson}
           onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
+          onMoveLesson={editLesson ? (date, time) => moveLesson(editLesson.id, date, time) : undefined}
         />
       )}
 
@@ -580,6 +589,8 @@ interface LessonFormProps {
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
   onCancelLesson: (() => void) | null;
+  /** Reschedules just this lesson instance (by date+time) — never touches other lessons in a recurring series. */
+  onMoveLesson?: (date: string, time: string) => void;
 }
 
 export function LessonFormModal({
@@ -595,6 +606,7 @@ export function LessonFormModal({
   onClose,
   onSave,
   onCancelLesson,
+  onMoveLesson,
 }: LessonFormProps) {
   const isEdit = !!lesson;
   const [date, setDate] = useState(lesson?.date || TODAY_KEY);
@@ -725,6 +737,15 @@ export function LessonFormModal({
             <Field label="Время">
               <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </Field>
+            {isEdit && onMoveLesson && (
+              <button
+                type="button"
+                onClick={() => onMoveLesson(date, time)}
+                className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium text-[#2563EB] bg-blue-50 hover:bg-blue-100 px-3.5 py-2.5 rounded-xl transition"
+              >
+                <CalendarClock size={15} /> Перенести урок на эти дату и время
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Длительность, мин">
                 <TextInput type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} />

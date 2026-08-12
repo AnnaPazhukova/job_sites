@@ -33,21 +33,10 @@ function addMinutes(time: string, minutes: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-function minutesToTime(total: number) {
-  const t = ((Math.round(total) % 1440) + 1440) % 1440;
-  const h = Math.floor(t / 60);
-  const m = t % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
 const HOUR_PX = 52;
 const DEFAULT_START_HOUR = 8;
 const DEFAULT_END_HOUR = 21;
 const GRID_MAX_HEIGHT = 620;
-const DRAG_SNAP_MIN = 5;
-const PRESS_HOLD_MS = 350;
-const PRESS_MOVE_CANCEL_PX = 8;
-const MOUSE_DRAG_MOVE_PX = 4;
 
 // Google-Calendar-style side-by-side layout for events that overlap in
 // time: each item gets a column index and the total column count for the
@@ -77,46 +66,12 @@ interface Props {
   gcalEvents?: GcalEvent[];
   onDayClick: (date: Date) => void;
   onLessonClick: (lesson: Lesson) => void;
-  /** Omit to keep the grid read-only (e.g. the student portal) — lessons stay tap-to-open only. */
-  onLessonMove?: (lesson: Lesson, date: string, time: string) => void;
 }
 
-export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick, onLessonMove }: Props) {
+export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick }: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const dayColRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const draggable = Boolean(onLessonMove);
-
-  // Press-and-hold to reschedule: a plain tap still opens the lesson. On
-  // touch/pen, holding still for PRESS_HOLD_MS arms drag mode (movement
-  // before then cancels it, so a scroll/swipe isn't mistaken for a
-  // long-press); on mouse there's no scroll to confuse it with, so drag
-  // arms as soon as the press moves — see movePress/armDrag.
-  const pressRef = useRef<{
-    pointerId: number;
-    lesson: Lesson;
-    startX: number;
-    startY: number;
-    el: HTMLElement;
-    timer?: ReturnType<typeof setTimeout>;
-  } | null>(null);
-  const [drag, setDrag] = useState<{ lesson: Lesson; pointerId: number; dayIndex: number; minutes: number } | null>(null);
-
-  useEffect(() => {
-    if (!drag) return;
-    document.body.style.cursor = "grabbing";
-    return () => {
-      document.body.style.cursor = "";
-    };
-  }, [drag]);
-
-  useEffect(
-    () => () => {
-      if (pressRef.current?.timer) clearTimeout(pressRef.current.timer);
-    },
-    []
-  );
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -169,88 +124,6 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const gridHeight = hours.length * HOUR_PX;
   const topPx = (minutes: number) => ((minutes - startHour * 60) / 60) * HOUR_PX;
-
-  // Which day column and snapped time a pointer position lands on — shared
-  // by drag start (so the ghost appears under the finger right away) and
-  // every subsequent move.
-  function computeDragTarget(clientX: number, clientY: number) {
-    const rects = dayColRefs.current.map((el) => el?.getBoundingClientRect());
-    let dayIndex = 0;
-    for (let idx = 0; idx < rects.length; idx++) {
-      const r = rects[idx];
-      if (r && clientX >= r.left) dayIndex = idx;
-    }
-    const rect = rects[dayIndex];
-    const rawMinutes = rect ? ((clientY - rect.top) / HOUR_PX) * 60 + startHour * 60 : startHour * 60;
-    const snapped = Math.round(rawMinutes / DRAG_SNAP_MIN) * DRAG_SNAP_MIN;
-    const minutes = Math.max(startHour * 60, Math.min(endHour * 60 - DRAG_SNAP_MIN, snapped));
-    return { dayIndex, minutes };
-  }
-
-  function armDrag(lesson: Lesson, pointerId: number, el: HTMLElement, clientX: number, clientY: number) {
-    pressRef.current = null;
-    el.setPointerCapture(pointerId);
-    setDrag({ lesson, pointerId, ...computeDragTarget(clientX, clientY) });
-  }
-
-  function startPress(e: React.PointerEvent<HTMLButtonElement>, lesson: Lesson) {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    e.stopPropagation();
-    if (pressRef.current?.timer) clearTimeout(pressRef.current.timer);
-    const { clientX: startX, clientY: startY, pointerId, pointerType } = e;
-    const el = e.currentTarget;
-    const press: NonNullable<typeof pressRef.current> = { pointerId, lesson, startX, startY, el };
-    // Touch/pen needs a brief hold before drag arms, so a quick swipe to
-    // scroll the grid isn't mistaken for picking up the lesson. A mouse
-    // press has no such conflict — dragging can arm as soon as it moves
-    // (see movePress), matching the ordinary press-and-drag desktop gesture.
-    if (pointerType !== "mouse") {
-      press.timer = setTimeout(() => armDrag(lesson, pointerId, el, startX, startY), PRESS_HOLD_MS);
-    }
-    pressRef.current = press;
-  }
-
-  function movePress(e: React.PointerEvent<HTMLButtonElement>) {
-    if (drag && drag.pointerId === e.pointerId) {
-      e.preventDefault();
-      setDrag((d) => (d ? { ...d, ...computeDragTarget(e.clientX, e.clientY) } : d));
-      return;
-    }
-    const press = pressRef.current;
-    if (!press || press.pointerId !== e.pointerId) return;
-    const dist = Math.hypot(e.clientX - press.startX, e.clientY - press.startY);
-    if (e.pointerType === "mouse") {
-      if (dist > MOUSE_DRAG_MOVE_PX) armDrag(press.lesson, press.pointerId, press.el, e.clientX, e.clientY);
-    } else if (dist > PRESS_MOVE_CANCEL_PX) {
-      if (press.timer) clearTimeout(press.timer);
-      pressRef.current = null;
-    }
-  }
-
-  function endPress(e: React.PointerEvent<HTMLButtonElement>) {
-    const press = pressRef.current;
-    if (press && press.pointerId === e.pointerId) {
-      if (press.timer) clearTimeout(press.timer);
-      pressRef.current = null;
-      onLessonClick(press.lesson);
-      return;
-    }
-    if (drag && drag.pointerId === e.pointerId) {
-      const newDate = dateKey(days[drag.dayIndex]);
-      const newTime = minutesToTime(drag.minutes);
-      const moved = newDate !== drag.lesson.date || newTime !== drag.lesson.time;
-      setDrag(null);
-      if (moved) onLessonMove?.(drag.lesson, newDate, newTime);
-    }
-  }
-
-  function cancelPress(e: React.PointerEvent<HTMLButtonElement>) {
-    if (pressRef.current?.pointerId === e.pointerId) {
-      if (pressRef.current.timer) clearTimeout(pressRef.current.timer);
-      pressRef.current = null;
-    }
-    if (drag?.pointerId === e.pointerId) setDrag(null);
-  }
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -337,9 +210,6 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
             return (
               <div
                 key={i}
-                ref={(el) => {
-                  dayColRefs.current[i] = el;
-                }}
                 onClick={() => onDayClick(d)}
                 className="relative border-l border-[#F0F1F4] cursor-pointer hover:bg-[#FAFBFC] transition"
               >
@@ -378,35 +248,15 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                   const l = p.lesson;
                   const appearance = lessonAppearance(l);
                   const hasCustomColor = !!appearance.style;
-                  const beingDragged = drag?.lesson.id === l.id;
                   return (
                     <button
                       key={l.id}
-                      onClick={draggable ? (e) => e.stopPropagation() : (e) => { e.stopPropagation(); onLessonClick(l); }}
-                      onPointerDown={draggable ? (e) => startPress(e, l) : undefined}
-                      onPointerMove={draggable ? movePress : undefined}
-                      onPointerUp={draggable ? endPress : undefined}
-                      onPointerCancel={draggable ? cancelPress : undefined}
-                      style={{
-                        ...style,
-                        ...appearance.style,
-                        // Has to be "none" from the very first touch, not just once drag
-                        // arms: the browser starts deciding "is this a scroll?" on the
-                        // first sub-pixel move, and with the default touch-action it can
-                        // win that race and fire pointercancel before our own hold-timer
-                        // (or its own 8px-move threshold) ever gets a say. Losing the
-                        // ability to start a page-scroll with a finger placed exactly on
-                        // a lesson chip is an acceptable trade — same as every other
-                        // touch calendar.
-                        touchAction: draggable ? "none" : undefined,
-                        opacity: beingDragged ? 0.35 : undefined,
-                        // A long-press is how drag starts on touch — without these, the
-                        // browser's own long-press handling (text selection, iOS's
-                        // copy/lookup callout) fires first and eats the gesture.
-                        WebkitTouchCallout: draggable ? "none" : undefined,
-                        WebkitUserSelect: draggable ? "none" : undefined,
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLessonClick(l);
                       }}
-                      className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className} ${draggable ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+                      style={{ ...style, ...appearance.style }}
+                      className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className}`}
                     >
                       <div className="flex items-center gap-1">
                         {hasCustomColor && l.status !== "cancelled" && (
@@ -418,18 +268,6 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                     </button>
                   );
                 })}
-
-                {drag && drag.dayIndex === i && (
-                  <div
-                    className="absolute left-0 right-0 rounded-md border-2 border-dashed border-[#2563EB] bg-[#2563EB]/10 px-1.5 py-1 overflow-hidden pointer-events-none z-30"
-                    style={{ top: topPx(drag.minutes), height: Math.max(topPx(drag.minutes + drag.lesson.duration) - topPx(drag.minutes), 20) }}
-                  >
-                    <div className="text-[10px] font-semibold text-[#2563EB] tabular-nums">
-                      {minutesToTime(drag.minutes)}–{minutesToTime(drag.minutes + drag.lesson.duration)}
-                    </div>
-                    <div className="text-[10px] text-[#2563EB] truncate">{lessonLabel(drag.lesson, students)}</div>
-                  </div>
-                )}
 
                 {todayCol && nowMinutes >= startHour * 60 && nowMinutes <= endHour * 60 && (
                   <div className="absolute left-0 right-0 flex items-center z-10 pointer-events-none" style={{ top: topPx(nowMinutes) - 5 }}>
