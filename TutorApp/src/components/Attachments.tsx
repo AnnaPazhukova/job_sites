@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Paperclip, Upload, X } from "lucide-react";
-import { fileStorageEnabled, uploadAttachment } from "../lib/fileStorage";
+import { fileStorageEnabled, forceDownloadUrl, uploadAttachment } from "../lib/fileStorage";
 import { getPdfPageCount, renderPdfPageToCanvas } from "../lib/pdfPages";
 import type { Attachment } from "../lib/types";
 
@@ -72,10 +72,8 @@ function ImageThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
 function FilePill({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
   return (
     <a
-      href={a.url}
-      target="_blank"
+      href={forceDownloadUrl(a.url, a.name)}
       rel="noreferrer"
-      download={a.name}
       className={`group inline-flex items-center gap-1.5 pl-2.5 ${onRemove ? "pr-1.5" : "pr-3"} py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-700 max-w-[220px] transition`}
     >
       <Paperclip size={12} className="shrink-0" />

@@ -41,3 +41,18 @@ export async function uploadAttachment(file: File, folder?: string): Promise<Att
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return { id, name: file.name, url: data.publicUrl, mimeType: file.type, size: file.size };
 }
+
+// A plain `<a href download>` only forces a real download when the URL is
+// same-origin — browsers silently ignore the `download` attribute for
+// cross-origin links (which every attachment URL is here, served from
+// Supabase's domain, not the app's). For file types the browser has no
+// built-in viewer for (.doc/.docx and friends — unlike images/PDF, which
+// render inline just fine), that means clicking one just navigates to a
+// blank/stuck tab instead of downloading anything. Supabase Storage honors
+// a `?download` query param by adding a real `Content-Disposition:
+// attachment` response header, which forces the download at the HTTP
+// level regardless of origin or browser — that's what this builds.
+export function forceDownloadUrl(url: string, filename: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}download=${encodeURIComponent(filename)}`;
+}
