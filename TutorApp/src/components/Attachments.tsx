@@ -95,12 +95,22 @@ function FilePill({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
   );
 }
 
-export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+// `onRemove` is opt-in — plain display contexts (e.g. a student viewing
+// their own already-submitted work, or already-sent message history) omit
+// it and get the same read-only list as before; passing it turns each
+// thumb's existing (but until now unused here) delete button on.
+export function AttachmentList({ attachments, onRemove }: { attachments: Attachment[]; onRemove?: (id: string) => void }) {
   if (attachments.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">
       {attachments.map((a) =>
-        isImage(a) ? <ImageThumb key={a.id} a={a} /> : isPdf(a) ? <PdfThumb key={a.id} a={a} /> : <FilePill key={a.id} a={a} />
+        isImage(a) ? (
+          <ImageThumb key={a.id} a={a} onRemove={onRemove ? () => onRemove(a.id) : undefined} />
+        ) : isPdf(a) ? (
+          <PdfThumb key={a.id} a={a} onRemove={onRemove ? () => onRemove(a.id) : undefined} />
+        ) : (
+          <FilePill key={a.id} a={a} onRemove={onRemove ? () => onRemove(a.id) : undefined} />
+        )
       )}
     </div>
   );

@@ -251,23 +251,35 @@ export function HomeworkEditModal({
   const [due, setDue] = useState(homework.due || "");
   const [status, setStatus] = useState<HomeworkStatus>(normalizeHomeworkStatus(homework.status));
   const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
+  const [submissionAttachments, setSubmissionAttachments] = useState<Attachment[]>(homework.submissionAttachments || []);
   const [reviewComment, setReviewComment] = useState(homework.reviewComment || "");
   const [grade, setGrade] = useState<number | undefined>(homework.grade);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave(homework.id, { title: title.trim(), due: due || null, status, attachments, reviewComment: reviewComment.trim() || undefined, grade });
+    onSave(homework.id, {
+      title: title.trim(),
+      due: due || null,
+      status,
+      attachments,
+      submissionAttachments,
+      reviewComment: reviewComment.trim() || undefined,
+      grade,
+    });
   }
 
   return (
     <Modal title="Домашнее задание" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <div className="text-sm text-gray-500">{homework.studentName}</div>
-        {homework.submissionAttachments && homework.submissionAttachments.length > 0 && (
+        {submissionAttachments.length > 0 && (
           <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1.5">Ответ ученика</div>
-            <AttachmentList attachments={homework.submissionAttachments} />
+            <AttachmentList
+              attachments={submissionAttachments}
+              onRemove={(id) => setSubmissionAttachments((prev) => prev.filter((a) => a.id !== id))}
+            />
           </div>
         )}
         <Field label="Задание">
