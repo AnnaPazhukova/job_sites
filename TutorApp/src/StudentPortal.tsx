@@ -38,15 +38,14 @@ const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> =
 // anything already sent off or already reviewed.
 const HW_SORT_ORDER: Record<HomeworkStatus, number> = { assigned: 0, submitted: 1, done: 2 };
 
+// Homework has no createdAt field, but new items are always appended to the
+// stored array (see App.tsx/HomeworkView.tsx's setHomework([...homework,
+// created])), so array position already reflects true assignment order —
+// reversing it puts the newest first. Array.prototype.sort is stable, so
+// the status grouping below doesn't disturb that newest-first order within
+// each group.
 function sortedHomework(homework: Homework[]): Homework[] {
-  return [...homework].sort((a, b) => {
-    const order = HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)];
-    if (order !== 0) return order;
-    if (a.due && b.due) return a.due.localeCompare(b.due);
-    if (a.due) return -1;
-    if (b.due) return 1;
-    return 0;
-  });
+  return [...homework].reverse().sort((a, b) => HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)]);
 }
 
 // A student is unlikely to ever revisit homework the tutor has already

@@ -7,10 +7,18 @@ import type { Attachment, MethodNote, MethodNoteAttachments, MethodNoteTabKey, M
 
 const subjectsForGrade = (grade: string) => {
   if (grade === "5 класс" || grade === "6 класс") return ["Математика"];
-  if (grade === "9 класс") return ["Алгебра", "Геометрия", "Подготовка к ОГЭ"];
+  if (grade === "9 класс") return ["Алгебра", "Геометрия", "ОГЭ-Матем", "ОГЭ-Инфа"];
   return ["Алгебра", "Геометрия"];
 };
-const ALL_SUBJECTS = ["Математика", "Алгебра", "Геометрия", "Подготовка к ОГЭ"];
+const ALL_SUBJECTS = ["Математика", "Алгебра", "Геометрия", "ОГЭ-Матем", "ОГЭ-Инфа"];
+// Legacy label for what's now "ОГЭ-Матем" — notes saved under the old name
+// before this rename still carry it verbatim in stored data (subject is
+// snapshotted on the note, not looked up live), so anywhere a subject is
+// read for display/filtering it needs mapping through this first.
+const LEGACY_SUBJECT_ALIASES: Record<string, string> = { "Подготовка к ОГЭ": "ОГЭ-Матем" };
+function displaySubject(subject: string): string {
+  return LEGACY_SUBJECT_ALIASES[subject] || subject;
+}
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
 const OGE_PREP_TEMPLATE = `Работа с текстом задания: чтение условия, планы участков, схемы
@@ -106,7 +114,7 @@ const ALGEBRA_7_TEMPLATE = `Рациональные числа: повторе�
 Итоговая контрольная работа за год + разбор`;
 
 const BULK_TEMPLATES: Record<string, string> = {
-  "9 класс|Подготовка к ОГЭ": OGE_PREP_TEMPLATE,
+  "9 класс|ОГЭ-Матем": OGE_PREP_TEMPLATE,
   "7 класс|Алгебра": ALGEBRA_7_TEMPLATE,
 };
 
@@ -174,7 +182,7 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
   const filteredNotes = useMemo(() => {
     return notes.filter((n) => {
       if (gradeFilter !== "Все классы" && n.grade !== gradeFilter) return false;
-      if (subjectFilter !== "Все предметы" && n.subject !== subjectFilter) return false;
+      if (subjectFilter !== "Все предметы" && displaySubject(n.subject) !== subjectFilter) return false;
       if (query.trim() && !n.topic.toLowerCase().includes(query.trim().toLowerCase())) return false;
       return true;
     });
@@ -370,7 +378,7 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-bold text-lg">{active.topic}</h3>
                   {active.grade && <Pill tone="level">{active.grade}</Pill>}
-                  {active.subject && <Pill>{active.subject}</Pill>}
+                  {active.subject && <Pill>{displaySubject(active.subject)}</Pill>}
                 </div>
                 <div className="flex items-center gap-2">
                   {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
