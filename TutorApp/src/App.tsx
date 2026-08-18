@@ -68,11 +68,21 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     setTimeout(() => setToast(null), 2200);
   }, []);
 
+  // A toast is a confirmation for whatever screen it appeared on — if the
+  // tutor then navigates elsewhere (not as part of that same action, e.g.
+  // clicking into a different section) before it's faded out, it shouldn't
+  // still be sitting there a couple screens later, overlapping content it
+  // has nothing to do with. Actions that show a toast *and* navigate as one
+  // step (e.g. excluding a student) keep using setView directly instead, so
+  // their own confirmation isn't wiped out by this.
+  const clearToast = useCallback(() => setToast(null), []);
+
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
   const openNote = useCallback((id: string) => {
     setActiveNoteId(id);
+    setToast(null);
     setView("notes");
   }, []);
 
@@ -141,6 +151,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                 active={view === item.id || (view === "student-detail" && item.id === "students")}
                 onClick={() => {
                   if (item.disabled) return;
+                  clearToast();
                   setView(item.id);
                   setSidebarOpen(false);
                 }}
@@ -183,6 +194,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                       lessons={lessons}
                       setView={setView}
                       showToast={showToast}
+                      clearToast={clearToast}
                       setSelectedStudentId={setSelectedStudentId}
                     />
                   ) : (

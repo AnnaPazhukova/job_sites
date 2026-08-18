@@ -549,7 +549,9 @@ function NoteRow({
       }`}
     >
       <GripVertical size={12} className="text-gray-300 shrink-0 cursor-grab" />
-      <span className="truncate flex-1">{note.topic}</span>
+      <span className="truncate flex-1" title={note.topic}>
+        {note.topic}
+      </span>
       <Trash2
         size={13}
         className="text-gray-300 hover:text-red-500 shrink-0 ml-1"
