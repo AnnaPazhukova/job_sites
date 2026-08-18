@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Calendar as CalendarIcon, Mail, Phone, Plus, School, Search, Settings as SettingsIcon, Star, Target, Trash2, User, UsersRound, Wallet } from "lucide-react";
-import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, Select, TextInput } from "../components/ui";
+import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { durationLabel, fmtMoney, GRADES, isLessonPast, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
 
@@ -26,10 +26,11 @@ interface Props {
   lessons: Lesson[];
   setView: (v: "students" | "student-detail") => void;
   showToast: (t: string) => void;
+  clearToast: () => void;
   setSelectedStudentId: (id: string) => void;
 }
 
-export function StudentsView({ students, setStudents, lessons, setView, showToast, setSelectedStudentId }: Props) {
+export function StudentsView({ students, setStudents, lessons, setView, showToast, clearToast, setSelectedStudentId }: Props) {
   const [query, setQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
@@ -73,6 +74,7 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
   }
 
   function openStudent(id: string) {
+    clearToast();
     setSelectedStudentId(id);
     setView("student-detail");
   }
@@ -185,7 +187,7 @@ function AddStudentModal({
   const [rate, setRate] = useState("");
   const [duration, setDuration] = useState(60);
   const [birthDate, setBirthDate] = useState("");
-  const [grade, setGrade] = useState(GRADES[2]);
+  const [grade, setGrade] = useState("");
   const [school, setSchool] = useState("");
   const [goal, setGoal] = useState("");
 
@@ -225,7 +227,18 @@ function AddStudentModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Класс">
-            <Select value={grade} onChange={setGrade} options={GRADES} />
+            <select
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB]"
+            >
+              <option value="">Не выбран</option>
+              {GRADES.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Учебное заведение">
             <TextInput icon={School} value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Лицей №9" />

@@ -22,7 +22,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker, Modal, PrimaryButton, RecurrenceFields, Select, TextArea, TextInput } from "../components/ui";
+import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker, Modal, PrimaryButton, RecurrenceFields, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import {
   buildHomeworkAssignment,
@@ -313,7 +313,18 @@ export function StudentDetailPage({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Класс">
-                <Select value={student.grade || GRADES[2]} onChange={(v) => save({ grade: v })} options={GRADES} />
+                <select
+                  value={student.grade || ""}
+                  onChange={(e) => save({ grade: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB]"
+                >
+                  <option value="">Не выбран</option>
+                  {GRADES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Учебное заведение">
                 <TextInput icon={School} value={student.school || ""} onChange={(e) => save({ school: e.target.value })} placeholder="Лицей №9" />
@@ -883,10 +894,10 @@ export function LessonFormModal({
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <div className="flex gap-2 order-2 sm:order-1">
             <GhostButton full onClick={onClose}>
-              Отмена
+              Закрыть
             </GhostButton>
             {isEdit && onCancelLesson && (
-              <GhostButton full danger onClick={onCancelLesson}>
+              <GhostButton full danger onClick={() => window.confirm("Отменить это занятие?") && onCancelLesson()}>
                 Отменить занятие
               </GhostButton>
             )}
