@@ -741,7 +741,7 @@ export function LessonFormModal({
               type="button"
               onClick={() => setPaymentStatus((p) => (p === "paid" ? "pending" : "paid"))}
               className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl border transition
-                ${paymentStatus === "paid" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-600"}`}
+                ${paymentStatus === "paid" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-blue-50 border-blue-200 text-[#2563EB]"}`}
             >
               {paymentStatus === "paid" ? <Check size={15} /> : <Wallet size={15} />}
               {paymentStatus === "paid" ? "Оплачено" : "Отметить оплату"}

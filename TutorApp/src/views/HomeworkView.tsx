@@ -195,12 +195,13 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
                   </span>
                 )}
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
-                {h.status !== "done" && (
+                {normalizeHomeworkStatus(h.status) === "submitted" && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       markDone(h.id);
                     }}
+                    title="Отметить проверенным"
                     className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 shrink-0"
                   >
                     <Check size={16} />
