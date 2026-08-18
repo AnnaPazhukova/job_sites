@@ -51,8 +51,6 @@ export interface Lesson {
   nextPlan?: string;
   /** Record of the lesson — e.g. a photo/PDF of the notes covered. */
   attachments?: Attachment[];
-  /** Set once this lesson is linked to a Google Calendar event (either direction) — see gcalSync.ts. */
-  gcalEventId?: string;
 }
 
 // assigned: given to the student, not yet turned in.
