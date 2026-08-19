@@ -297,18 +297,19 @@ export default function StudentPortal({ code, onExit }: Props) {
           <>
             <PageHeader title={profile ? `Здравствуйте, ${profile.firstName || profile.name}!` : "Личный кабинет"} />
 
-            <div className="flex gap-1 mb-5 border-b border-[#E7E9EE] overflow-x-auto">
+            <div className="flex mb-5 border-b border-[#E7E9EE]">
               {TABS.map((t) => {
                 const Icon = t.icon;
                 return (
                   <button
                     key={t.id}
                     onClick={() => setTab(t.id)}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
+                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
                       tab === t.id ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <Icon size={15} /> {t.label}
+                    <Icon size={15} className="shrink-0" />
+                    <span className="truncate">{t.label}</span>
                   </button>
                 );
               })}
@@ -345,7 +346,14 @@ export default function StudentPortal({ code, onExit }: Props) {
                       students={profile ? [profile] : []}
                       onDayClick={() => {}}
                       onLessonClick={(l) => {
-                        if (l.status === "cancelled" || !isLessonPast(l)) return;
+                        if (l.status === "cancelled") {
+                          showToast("Занятие отменено");
+                          return;
+                        }
+                        if (!isLessonPast(l)) {
+                          showToast("Подробности появятся после урока");
+                          return;
+                        }
                         setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
                       }}
                     />
