@@ -187,12 +187,15 @@ export function Modal({
   children,
   wide,
   full,
+  headerActions,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
   full?: boolean;
+  /** Extra buttons (e.g. delete) shown before the close X in the header. */
+  headerActions?: ReactNode;
 }) {
   const sizeClass = full ? "sm:max-w-6xl sm:w-[92vw]" : wide ? "sm:max-w-lg" : "sm:max-w-md";
   return (
@@ -206,9 +209,12 @@ export function Modal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E9EE] sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {headerActions}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <div className="p-5">{children}</div>
       </div>
