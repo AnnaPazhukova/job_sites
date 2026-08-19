@@ -14,7 +14,7 @@ import {
 import { useStore } from "./lib/storage";
 import { isLessonPast } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId, WeeklyTemplateSlot } from "./lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
 
 import { StudentsView } from "./views/StudentsView";
 import { StudentDetailPage } from "./views/StudentDetailView";
@@ -50,7 +50,6 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   const [students, setStudents, studentsLoaded] = useStore<Student[]>("students", []);
   const [groups, setGroups] = useStore<Group[]>("groups", []);
   const [lessons, setLessons] = useStore<Lesson[]>("lessons", []);
-  const [weeklyTemplate, setWeeklyTemplate] = useStore<WeeklyTemplateSlot[]>("weekly-template", []);
   const [homework, setHomework] = useStore<Homework[]>("homework", []);
   const [messages, setMessages] = useStore<MessagesByStudent>("messages", {});
   const [tasks, saveTasks] = useStore<Task[]>("tasks", []);
@@ -219,8 +218,6 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   students={students}
                   setStudents={setStudents}
                   groups={groups}
-                  weeklyTemplate={weeklyTemplate}
-                  setWeeklyTemplate={setWeeklyTemplate}
                   homework={homework}
                   setHomework={setHomework}
                   messages={messages}
