@@ -40,6 +40,15 @@ export function durationLabel(minutes: number) {
   return LESSON_DURATIONS.find((d) => d.minutes === minutes)?.label || `${minutes} мин`;
 }
 
+// Russian plural forms: pluralRu(1, ["занятие", "занятия", "занятий"]) → "занятие".
+export function pluralRu(n: number, forms: [string, string, string]): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+  return forms[2];
+}
+
 // Past lessons get a noticeably darker/more saturated tint than upcoming
 // ones, so already-happened lessons are distinguishable at a glance.
 export function lessonPillStyle(color: string | null | undefined, past = false): { background: string; color: string } | undefined {
