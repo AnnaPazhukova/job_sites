@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
-import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
+import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { durationLabel, fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -12,6 +12,7 @@ import {
   fetchStudentMessages,
   fetchStudentProfile,
   markStudentHomeworkDone,
+  requestLessonCancel,
   sendStudentMessage,
 } from "./lib/studentData";
 import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "./lib/types";
@@ -187,6 +188,7 @@ export default function StudentPortal({ code, onExit }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<"invalid" | "setup" | null>(null);
   const [openDetail, setOpenDetail] = useState<DetailTarget | null>(null);
+  const [openUpcoming, setOpenUpcoming] = useState<Lesson | null>(null);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -250,6 +252,17 @@ export default function StudentPortal({ code, onExit }: Props) {
       showToast("Отправлено репетитору на проверку");
     } catch {
       showToast("Не удалось сохранить, попробуйте ещё раз");
+    }
+  }
+
+  async function requestCancel(lessonId: string) {
+    setLessons((ls) => ls.map((l) => (l.id === lessonId ? { ...l, cancelRequested: true } : l)));
+    setOpenUpcoming((l) => (l && l.id === lessonId ? { ...l, cancelRequested: true } : l));
+    try {
+      await requestLessonCancel(code, lessonId);
+      showToast("Запрос на отмену отправлен репетитору");
+    } catch {
+      showToast("Не удалось отправить запрос, попробуйте ещё раз");
     }
   }
 
@@ -354,7 +367,7 @@ export default function StudentPortal({ code, onExit }: Props) {
                               return;
                             }
                             if (!isLessonPast(l)) {
-                              showToast("Подробности появятся после урока");
+                              setOpenUpcoming(l);
                               return;
                             }
                             setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
@@ -404,6 +417,29 @@ export default function StudentPortal({ code, onExit }: Props) {
           onSubmitHomework={submitHomework}
           onClose={() => setOpenDetail(null)}
         />
+      )}
+
+      {openUpcoming && (
+        <Modal title={`Урок · ${fmtDateRu(openUpcoming.date)}`} onClose={() => setOpenUpcoming(null)}>
+          <div className="space-y-4">
+            <div className="text-sm text-gray-700">
+              {openUpcoming.time} · {durationLabel(openUpcoming.duration)}
+            </div>
+            {openUpcoming.cancelRequested ? (
+              <div className="px-3.5 py-3 rounded-xl bg-amber-50 text-amber-700 text-sm">
+                Запрос на отмену отправлен, ждём подтверждения от преподавателя.
+              </div>
+            ) : (
+              <GhostButton
+                full
+                danger
+                onClick={() => window.confirm("Запросить отмену этого занятия?") && requestCancel(openUpcoming.id)}
+              >
+                Запросить отмену занятия
+              </GhostButton>
+            )}
+          </div>
+        </Modal>
       )}
 
       {toast && (

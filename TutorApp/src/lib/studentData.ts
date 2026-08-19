@@ -29,3 +29,9 @@ export async function markStudentHomeworkDone(code: string, id: string, attachme
   const { error } = await supabase.rpc("portal_mark_homework_done", { p_code: code, p_homework_id: id, p_attachments: attachments });
   if (error) throw error;
 }
+
+export async function requestLessonCancel(code: string, lessonId: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc("portal_request_lesson_cancel", { p_code: code, p_lesson_id: lessonId });
+  if (error) throw error;
+}
