@@ -242,6 +242,9 @@ export function ScheduleView({
   const dayLessonCount = mode === "day" ? displayedLessons.filter((l) => l.date === dateKey(cursor) && l.status !== "cancelled").length : 0;
   const highlightDates = useMemo(() => new Set(displayedLessons.map((l) => l.date)), [displayedLessons]);
   const cancelRequests = lessons.filter((l) => l.cancelRequested);
+  const missingRecordLessons = lessons
+    .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !l.comment && (!l.attachments || l.attachments.length === 0))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   return (
     <div>
@@ -362,6 +365,33 @@ export function ScheduleView({
                 >
                   <Check size={13} /> Принять
                 </button>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
+      {missingRecordLessons.length > 0 && (
+        <Card className="mb-4 divide-y divide-amber-100 border-amber-200 bg-amber-50/40">
+          <div className="px-4 sm:px-5 py-3 flex items-center gap-2 text-amber-700 text-sm font-semibold">
+            <AlertTriangle size={16} /> Нет записи или комментария после урока
+          </div>
+          {missingRecordLessons.map((l) => {
+            const st = students.find((s) => s.id === l.studentId);
+            return (
+              <div
+                key={l.id}
+                onClick={() => setEditLesson(l)}
+                className="flex items-center gap-3 px-4 sm:px-5 py-3 cursor-pointer hover:bg-amber-50 transition"
+              >
+                {st ? <Avatar id={st.id} name={st.name} size={34} color={st.color} /> : <div className="w-[34px]" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{lessonLabel(l, students)}</div>
+                  <div className="text-xs text-gray-500">
+                    {fmtDateRu(l.date)} · {l.time}
+                  </div>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 shrink-0">Заполнить</span>
               </div>
             );
           })}
