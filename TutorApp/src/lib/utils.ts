@@ -121,6 +121,21 @@ export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
 }
 
+// Adjacent lessons for the same student, in chronological order — powers
+// the "◀ Предыдущий / Следующий ▶" navigation inside the lesson modal, so
+// the tutor can page through one student's lessons without closing it.
+export function adjacentLessons(lessons: Lesson[], current: Lesson): { prev: Lesson | null; next: Lesson | null } {
+  const sameStudent = lessons
+    .filter((l) => l.studentId === current.studentId)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const idx = sameStudent.findIndex((l) => l.id === current.id);
+  if (idx === -1) return { prev: null, next: null };
+  return {
+    prev: idx > 0 ? sameStudent[idx - 1] : null,
+    next: idx < sameStudent.length - 1 ? sameStudent[idx + 1] : null,
+  };
+}
+
 // The date of a student's next non-cancelled lesson after the given one —
 // used as the default homework due date ("due by the next lesson").
 export function nextLessonDate(lessons: Lesson[], studentId: string, afterDate: string, afterTime: string): string | null {
