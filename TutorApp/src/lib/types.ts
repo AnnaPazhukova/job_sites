@@ -129,17 +129,6 @@ export interface MethodNote {
   updatedAt: number;
 }
 
-export interface WeeklyTemplateSlot {
-  id: string;
-  weekday: number; // 0=Mon..6=Sun
-  time: string;
-  duration: number;
-  price: number;
-  studentId?: string;
-  groupId?: string;
-  title: string;
-}
-
 export type ViewId =
   | "students"
   | "student-detail"

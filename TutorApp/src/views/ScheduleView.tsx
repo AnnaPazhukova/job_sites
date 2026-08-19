@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
+import { AlertTriangle, Calendar as CalendarIcon, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
 import { Avatar, Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
   adjacentLessons,
@@ -18,14 +18,13 @@ import {
   type RecurrenceEnd,
   type RecurrenceFreq,
 } from "../lib/utils";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, WeeklyTemplateSlot } from "../lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { MiniCalendar } from "../components/MiniCalendar";
 import { LessonFormModal } from "./StudentDetailView";
 import { StudentBalances } from "./StudentBalances";
 import { WeekView, getWeekDays } from "./WeekView";
-import { WeeklyTemplateModal } from "./WeeklyTemplateModal";
 
 type DayItem = { kind: "gcal"; e: GcalEvent } | { kind: "lesson"; l: Lesson };
 
@@ -35,8 +34,6 @@ interface Props {
   students: Student[];
   setStudents: (s: Student[]) => void;
   groups: Group[];
-  weeklyTemplate: WeeklyTemplateSlot[];
-  setWeeklyTemplate: (t: WeeklyTemplateSlot[]) => void;
   homework: Homework[];
   setHomework: (h: Homework[]) => void;
   messages: MessagesByStudent;
@@ -51,8 +48,6 @@ export function ScheduleView({
   students,
   setStudents,
   groups,
-  weeklyTemplate,
-  setWeeklyTemplate,
   homework,
   setHomework,
   messages,
@@ -65,7 +60,6 @@ export function ScheduleView({
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<Date | null>(null);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
-  const [showTemplate, setShowTemplate] = useState(false);
   const [studentFilter, setStudentFilter] = useState("");
 
   const displayedLessons = studentFilter ? lessons.filter((l) => l.studentId === studentFilter) : lessons;
@@ -200,39 +194,6 @@ export function ScheduleView({
     else setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1));
   }
 
-  function applyWeeklyTemplate() {
-    const days = getWeekDays(cursor);
-    let created = 0;
-    const next: Lesson[] = [...lessons];
-    for (const day of days) {
-      const key = dateKey(day);
-      const weekday = (day.getDay() + 6) % 7;
-      for (const slot of weeklyTemplate) {
-        if (slot.weekday !== weekday) continue;
-        const exists = next.some(
-          (l) => l.date === key && l.time === slot.time && l.studentId === slot.studentId && l.groupId === slot.groupId
-        );
-        if (exists) continue;
-        next.push({
-          id: uid(),
-          studentId: slot.studentId,
-          groupId: slot.groupId,
-          title: slot.title,
-          date: key,
-          time: slot.time,
-          duration: slot.duration,
-          price: slot.price,
-          status: "scheduled",
-          paymentStatus: "pending",
-        });
-        created++;
-      }
-    }
-    setLessons(next);
-    setShowTemplate(false);
-    showToast(created > 0 ? `Добавлено занятий по шаблону: ${created}` : "По шаблону нечего добавлять — всё уже в расписании");
-  }
-
   const weekDays = mode === "week" ? getWeekDays(cursor) : [];
   const weekLabel =
     mode === "week" && weekDays.length
@@ -297,14 +258,6 @@ export function ScheduleView({
                 <ChevronRight size={16} />
               </button>
             </div>
-            {mode === "week" && (
-              <button
-                onClick={() => setShowTemplate(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition"
-              >
-                <CalendarClock size={15} /> Шаблон недели
-              </button>
-            )}
             {gcal.enabled &&
               (gcal.connected ? (
                 <div className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
@@ -520,17 +473,6 @@ export function ScheduleView({
             />
           );
         })()}
-
-      {showTemplate && (
-        <WeeklyTemplateModal
-          slots={weeklyTemplate}
-          setSlots={setWeeklyTemplate}
-          students={students}
-          groups={groups}
-          onClose={() => setShowTemplate(false)}
-          onApply={applyWeeklyTemplate}
-        />
-      )}
     </div>
   );
 }
