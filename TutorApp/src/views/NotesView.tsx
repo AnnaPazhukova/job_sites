@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, Layers, ListPlus, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, GripVertical, Layers, ListPlus, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Card, GhostButton, Modal, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
+import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
 
 const subjectsForGrade = (grade: string) => {
@@ -502,6 +503,20 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     showToast("Заметка сохранена");
   };
 
+  const starterForActive = active ? STARTER_CONTENT[active.topic] : undefined;
+
+  const handleFillStarter = () => {
+    if (!active || !starterForActive) return;
+    const next: MethodNoteTabs = { ...draftTabs };
+    (Object.keys(starterForActive) as MethodNoteTabKey[]).forEach((k) => {
+      const value = starterForActive[k];
+      if (value && !next[k]?.trim()) next[k] = value;
+    });
+    setDraftTabs(next);
+    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, tabs: next, updatedAt: Date.now() } : n)));
+    showToast("Вкладки заполнены типовым текстом");
+  };
+
   const handleAttachmentsChange = (tabKey: MethodNoteTabKey, next: Attachment[]) => {
     if (!active) return;
     const nextAttachments: MethodNoteAttachments = { ...(active.attachments || {}), [tabKey]: next };
@@ -675,6 +690,15 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                 </div>
                 <div className="flex items-center gap-2">
                   {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
+                  {starterForActive && (
+                    <button
+                      onClick={handleFillStarter}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition"
+                      title="Подставить типовой текст учебника в пустые вкладки"
+                    >
+                      <Sparkles size={13} /> Заполнить типовым текстом
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       if (window.confirm(`Удалить тему «${active.topic}»?`)) handleDelete(active.id);
