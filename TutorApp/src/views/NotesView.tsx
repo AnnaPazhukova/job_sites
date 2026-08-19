@@ -503,7 +503,7 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     showToast("Заметка сохранена");
   };
 
-  const starterForActive = active ? STARTER_CONTENT[active.topic] : undefined;
+  const starterForActive = active ? STARTER_CONTENT[`${active.grade}|${displaySubject(active.subject)}|${active.topic}`] : undefined;
 
   const handleFillStarter = () => {
     if (!active || !starterForActive) return;
