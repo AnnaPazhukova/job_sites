@@ -9,6 +9,7 @@ import {
   lessonLabel,
   lessonPillStyle,
   MONTHS_RU,
+  pluralRu,
   TODAY,
   WEEKDAYS_RU,
   uid,
@@ -18,6 +19,7 @@ import {
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, WeeklyTemplateSlot } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
+import { MiniCalendar } from "../components/MiniCalendar";
 import { LessonFormModal } from "./StudentDetailView";
 import { StudentBalances } from "./StudentBalances";
 import { WeekView, getWeekDays } from "./WeekView";
@@ -56,7 +58,7 @@ export function ScheduleView({
   notes,
   showToast,
 }: Props) {
-  const [mode, setMode] = useState<"month" | "week">("month");
+  const [mode, setMode] = useState<"month" | "week" | "day">("month");
   const [cursor, setCursor] = useState(TODAY);
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<Date | null>(null);
@@ -87,7 +89,7 @@ export function ScheduleView({
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
 
   const rangeStartISO = useMemo(() => {
-    const base = mode === "month" ? cells[0]?.date : getWeekDays(cursor)[0];
+    const base = mode === "month" ? cells[0]?.date : mode === "week" ? getWeekDays(cursor)[0] : cursor;
     const d = new Date(base || cursor);
     d.setDate(d.getDate() - 1);
     d.setHours(0, 0, 0, 0);
@@ -95,7 +97,7 @@ export function ScheduleView({
   }, [mode, cells, cursor]);
 
   const rangeEndISO = useMemo(() => {
-    const base = mode === "month" ? cells[cells.length - 1]?.date : getWeekDays(cursor)[6];
+    const base = mode === "month" ? cells[cells.length - 1]?.date : mode === "week" ? getWeekDays(cursor)[6] : cursor;
     const d = new Date(base || cursor);
     d.setDate(d.getDate() + 2);
     d.setHours(0, 0, 0, 0);
@@ -175,11 +177,15 @@ export function ScheduleView({
   }
 
   function goPrev() {
-    setCursor(mode === "month" ? new Date(year, month - 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
+    if (mode === "month") setCursor(new Date(year, month - 1, 1));
+    else if (mode === "week") setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
+    else setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 1));
   }
 
   function goNext() {
-    setCursor(mode === "month" ? new Date(year, month + 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7));
+    if (mode === "month") setCursor(new Date(year, month + 1, 1));
+    else if (mode === "week") setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7));
+    else setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1));
   }
 
   function applyWeeklyTemplate() {
@@ -220,6 +226,9 @@ export function ScheduleView({
     mode === "week" && weekDays.length
       ? `${weekDays[0].getDate()} ${MONTHS_RU[weekDays[0].getMonth()].toLowerCase()} – ${weekDays[6].getDate()} ${MONTHS_RU[weekDays[6].getMonth()].toLowerCase()}`
       : "";
+  const dayLabel = `${cursor.getDate()} ${MONTHS_RU[cursor.getMonth()].toLowerCase()} ${cursor.getFullYear()}, ${WEEKDAYS_RU[(cursor.getDay() + 6) % 7]}`;
+  const dayLessonCount = mode === "day" ? displayedLessons.filter((l) => l.date === dateKey(cursor) && l.status !== "cancelled").length : 0;
+  const highlightDates = useMemo(() => new Set(displayedLessons.map((l) => l.date)), [displayedLessons]);
 
   return (
     <div>
@@ -239,6 +248,12 @@ export function ScheduleView({
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "week" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
               >
                 Неделя
+              </button>
+              <button
+                onClick={() => setMode("day")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "day" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
+              >
+                День
               </button>
             </div>
             <button onClick={() => setCursor(TODAY)} className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition">
@@ -297,7 +312,14 @@ export function ScheduleView({
           </div>
         }
       />
-      <div className="text-xl font-bold mb-4">{mode === "month" ? `${MONTHS_RU[month]} ${year}` : weekLabel}</div>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="text-xl font-bold">{mode === "month" ? `${MONTHS_RU[month]} ${year}` : mode === "week" ? weekLabel : dayLabel}</div>
+        {mode === "day" && (
+          <span className="text-sm font-medium text-gray-500">
+            · {dayLessonCount} {pluralRu(dayLessonCount, ["занятие", "занятия", "занятий"])}
+          </span>
+        )}
+      </div>
 
       {students.length === 0 && groups.length === 0 && (
         <div className="mb-4 text-sm bg-amber-50 text-amber-700 px-4 py-2.5 rounded-xl">Добавьте учеников, чтобы планировать занятия</div>
@@ -305,6 +327,8 @@ export function ScheduleView({
 
       {gcal.error && <div className="mb-4 text-sm bg-red-50 text-red-600 px-4 py-2.5 rounded-xl">{gcal.error}</div>}
 
+      <div className="flex items-start gap-4">
+      <div className="flex-1 min-w-0">
       {mode === "month" ? (
         <Card className="overflow-hidden">
           <div className="grid grid-cols-7 border-b border-[#E7E9EE] bg-[#FAFBFC]">
@@ -360,7 +384,7 @@ export function ScheduleView({
             })}
           </div>
         </Card>
-      ) : (
+      ) : mode === "week" ? (
         <Card className="overflow-hidden">
           <WeekView
             cursor={cursor}
@@ -371,7 +395,25 @@ export function ScheduleView({
             onLessonClick={setEditLesson}
           />
         </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <WeekView
+            cursor={cursor}
+            days={[cursor]}
+            lessons={displayedLessons}
+            students={students}
+            gcalEvents={gcal.events}
+            onDayClick={openAdd}
+            onLessonClick={setEditLesson}
+          />
+        </Card>
       )}
+      </div>
+
+      <div className="hidden lg:block w-72 shrink-0">
+        <MiniCalendar selected={cursor} highlightDates={highlightDates} onSelect={setCursor} />
+      </div>
+      </div>
 
       <StudentBalances students={students} setStudents={setStudents} lessons={lessons} />
 

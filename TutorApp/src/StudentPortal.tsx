@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
+import { MiniCalendar } from "./components/MiniCalendar";
 import { fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
@@ -336,29 +337,40 @@ export default function StudentPortal({ code, onExit }: Props) {
                     </div>
                   </div>
                 </div>
-                {lessons.length === 0 ? (
-                  <EmptyState icon={Calendar} title="Занятий не запланировано" />
-                ) : (
-                  <Card className="overflow-hidden">
-                    <WeekView
-                      cursor={weekCursor}
-                      lessons={lessons}
-                      students={profile ? [profile] : []}
-                      onDayClick={() => {}}
-                      onLessonClick={(l) => {
-                        if (l.status === "cancelled") {
-                          showToast("Занятие отменено");
-                          return;
-                        }
-                        if (!isLessonPast(l)) {
-                          showToast("Подробности появятся после урока");
-                          return;
-                        }
-                        setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
-                      }}
+                <div className="flex items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    {lessons.length === 0 ? (
+                      <EmptyState icon={Calendar} title="Занятий не запланировано" />
+                    ) : (
+                      <Card className="overflow-hidden">
+                        <WeekView
+                          cursor={weekCursor}
+                          lessons={lessons}
+                          students={profile ? [profile] : []}
+                          onDayClick={() => {}}
+                          onLessonClick={(l) => {
+                            if (l.status === "cancelled") {
+                              showToast("Занятие отменено");
+                              return;
+                            }
+                            if (!isLessonPast(l)) {
+                              showToast("Подробности появятся после урока");
+                              return;
+                            }
+                            setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
+                          }}
+                        />
+                      </Card>
+                    )}
+                  </div>
+                  <div className="hidden lg:block w-72 shrink-0">
+                    <MiniCalendar
+                      selected={weekCursor}
+                      highlightDates={new Set(lessons.map((l) => l.date))}
+                      onSelect={setWeekCursor}
                     />
-                  </Card>
-                )}
+                  </div>
+                </div>
               </div>
             )}
 

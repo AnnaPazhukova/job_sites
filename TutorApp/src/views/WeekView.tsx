@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ExternalLink } from "lucide-react";
 import { dateKey, isLessonPast, lessonLabel, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
@@ -66,10 +66,14 @@ interface Props {
   gcalEvents?: GcalEvent[];
   onDayClick: (date: Date) => void;
   onLessonClick: (lesson: Lesson) => void;
+  /** Overrides the auto-computed Mon–Sun week — e.g. DayView passes a single day to reuse this same grid. */
+  days?: Date[];
 }
 
-export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick }: Props) {
-  const days = getWeekDays(cursor);
+export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick, days: daysProp }: Props) {
+  const days = daysProp ?? getWeekDays(cursor);
+  const dayLabels = days.length === 7 ? WEEKDAYS_RU : days.map((d) => WEEKDAYS_RU[(d.getDay() + 6) % 7]);
+  const gridCols = { ["--cols" as string]: days.length } as CSSProperties;
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -133,12 +137,12 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
   }, [cursor]);
 
   return (
-    <div>
-      <div className="grid grid-cols-[44px_repeat(7,1fr)] sm:grid-cols-[52px_repeat(7,1fr)]">
+    <div style={gridCols}>
+      <div className="grid grid-cols-[44px_repeat(var(--cols),1fr)] sm:grid-cols-[52px_repeat(var(--cols),1fr)]">
         <div />
         {days.map((d, i) => (
           <div key={i} className={`text-center py-2.5 border-b border-l border-[#F0F1F4] ${isToday(d) ? "bg-[#EEF2FF]" : "bg-[#FAFBFC]"}`}>
-            <div className="text-[10px] sm:text-xs font-semibold text-gray-500">{WEEKDAYS_RU[i]}</div>
+            <div className="text-[10px] sm:text-xs font-semibold text-gray-500">{dayLabels[i]}</div>
             <div
               className={`text-xs sm:text-sm mt-0.5 w-5 h-5 sm:w-6 sm:h-6 mx-auto flex items-center justify-center rounded-full ${
                 isToday(d) ? "bg-[#2563EB] text-white font-semibold" : "text-gray-800"
@@ -152,7 +156,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
       {/* All-day events get their own strip above the timed grid. */}
       {gcalEvents.some((e) => e.allDay && weekKeys.has(e.date)) && (
-        <div className="grid grid-cols-[44px_repeat(7,1fr)] sm:grid-cols-[52px_repeat(7,1fr)] border-b border-[#F0F1F4]">
+        <div className="grid grid-cols-[44px_repeat(var(--cols),1fr)] sm:grid-cols-[52px_repeat(var(--cols),1fr)] border-b border-[#F0F1F4]">
           <div />
           {days.map((d, i) => {
             const key = dateKey(d);
@@ -177,7 +181,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
       )}
 
       <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: GRID_MAX_HEIGHT }}>
-        <div className="grid grid-cols-[44px_repeat(7,1fr)] sm:grid-cols-[52px_repeat(7,1fr)]" style={{ height: gridHeight }}>
+        <div className="grid grid-cols-[44px_repeat(var(--cols),1fr)] sm:grid-cols-[52px_repeat(var(--cols),1fr)]" style={{ height: gridHeight }}>
           <div className="relative">
             {hours.map((h) => (
               <div key={h} className="absolute right-1.5 -translate-y-1/2 text-[10px] text-gray-400 tabular-nums" style={{ top: topPx(h * 60) }}>
