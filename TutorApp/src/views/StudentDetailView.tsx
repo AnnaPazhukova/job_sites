@@ -7,6 +7,7 @@ import {
   CalendarClock,
   Check,
   ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   KeyRound,
@@ -25,6 +26,7 @@ import {
 import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker, Modal, PrimaryButton, RecurrenceFields, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import {
+  adjacentLessons,
   buildHomeworkAssignment,
   buildRecurringDates,
   fmtDateRu,
@@ -544,26 +546,33 @@ export function StudentDetailPage({
         </div>
       )}
 
-      {showLessonForm && (
-        <LessonFormModal
-          studentName={student.name}
-          studentGrade={student.grade}
-          defaultRate={student.rate || 0}
-          defaultDuration={student.duration || 60}
-          lesson={editLesson}
-          homework={homework}
-          notes={notes}
-          onAssignHomework={handleAssignHomework}
-          onUpdateHomework={handleUpdateHomework}
-          onClose={() => {
-            setShowLessonForm(false);
-            setEditLesson(null);
-          }}
-          onSave={saveLesson}
-          onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
-          onMoveLesson={editLesson ? (date, time) => moveLesson(editLesson.id, date, time) : undefined}
-        />
-      )}
+      {showLessonForm &&
+        (() => {
+          const { prev, next } = editLesson ? adjacentLessons(lessons, editLesson) : { prev: null, next: null };
+          return (
+            <LessonFormModal
+              key={editLesson?.id || "new"}
+              studentName={student.name}
+              studentGrade={student.grade}
+              defaultRate={student.rate || 0}
+              defaultDuration={student.duration || 60}
+              lesson={editLesson}
+              homework={homework}
+              notes={notes}
+              onAssignHomework={handleAssignHomework}
+              onUpdateHomework={handleUpdateHomework}
+              onClose={() => {
+                setShowLessonForm(false);
+                setEditLesson(null);
+              }}
+              onSave={saveLesson}
+              onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
+              onMoveLesson={editLesson ? (date, time) => moveLesson(editLesson.id, date, time) : undefined}
+              onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
+              onNextLesson={next ? () => setEditLesson(next) : undefined}
+            />
+          );
+        })()}
 
       {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
     </div>
@@ -604,6 +613,9 @@ interface LessonFormProps {
   onCancelLesson: (() => void) | null;
   /** Reschedules just this lesson instance (by date+time) — never touches other lessons in a recurring series. */
   onMoveLesson?: (date: string, time: string) => void;
+  /** Adjacent lessons for the same student — set to switch the modal to that lesson without closing it. */
+  onPrevLesson?: () => void;
+  onNextLesson?: () => void;
 }
 
 export function LessonFormModal({
@@ -620,6 +632,8 @@ export function LessonFormModal({
   onSave,
   onCancelLesson,
   onMoveLesson,
+  onPrevLesson,
+  onNextLesson,
 }: LessonFormProps) {
   const isEdit = !!lesson;
   const [date, setDate] = useState(lesson?.date || TODAY_KEY);
@@ -747,6 +761,27 @@ export function LessonFormModal({
               {paymentStatus === "paid" ? "Оплачено" : "Отметить оплату"}
             </button>
           )}
+        </div>
+      )}
+
+      {isEdit && (onPrevLesson || onNextLesson) && (
+        <div className="flex items-center justify-between gap-2 mb-5 -mt-2">
+          <button
+            type="button"
+            onClick={onPrevLesson}
+            disabled={!onPrevLesson}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            <ChevronLeft size={16} /> Предыдущий урок
+          </button>
+          <button
+            type="button"
+            onClick={onNextLesson}
+            disabled={!onNextLesson}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            Следующий урок <ChevronRight size={16} />
+          </button>
         </div>
       )}
 

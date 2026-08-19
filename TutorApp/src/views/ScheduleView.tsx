@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
 import { Avatar, Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
+  adjacentLessons,
   buildHomeworkAssignment,
   buildRecurringDates,
   dateKey,
@@ -465,23 +466,30 @@ export function ScheduleView({
 
       {showAdd && <AddLessonModal date={addDate} students={students} groups={groups} onClose={() => setShowAdd(false)} onSave={addLesson} />}
 
-      {editLesson && (
-        <LessonFormModal
-          studentName={students.find((s) => s.id === editLesson.studentId)?.name || editLesson.title}
-          studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
-          defaultRate={editLesson.price}
-          defaultDuration={editLesson.duration}
-          lesson={editLesson}
-          homework={homework}
-          notes={notes}
-          onAssignHomework={handleAssignHomework}
-          onUpdateHomework={handleUpdateHomework}
-          onClose={() => setEditLesson(null)}
-          onSave={saveLessonEdit}
-          onCancelLesson={() => cancelLessonEdit(editLesson.id)}
-          onMoveLesson={(date, time) => moveLesson(editLesson.id, date, time)}
-        />
-      )}
+      {editLesson &&
+        (() => {
+          const { prev, next } = adjacentLessons(lessons, editLesson);
+          return (
+            <LessonFormModal
+              key={editLesson.id}
+              studentName={students.find((s) => s.id === editLesson.studentId)?.name || editLesson.title}
+              studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
+              defaultRate={editLesson.price}
+              defaultDuration={editLesson.duration}
+              lesson={editLesson}
+              homework={homework}
+              notes={notes}
+              onAssignHomework={handleAssignHomework}
+              onUpdateHomework={handleUpdateHomework}
+              onClose={() => setEditLesson(null)}
+              onSave={saveLessonEdit}
+              onCancelLesson={() => cancelLessonEdit(editLesson.id)}
+              onMoveLesson={(date, time) => moveLesson(editLesson.id, date, time)}
+              onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
+              onNextLesson={next ? () => setEditLesson(next) : undefined}
+            />
+          );
+        })()}
 
       {showTemplate && (
         <WeeklyTemplateModal
