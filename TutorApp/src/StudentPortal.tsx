@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
+import { AlertTriangle, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { durationLabel, fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { dateKey, durationLabel, fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -226,6 +226,18 @@ export default function StudentPortal({ code, onExit }: Props) {
   const weekDays = getWeekDays(weekCursor);
   const weekLabel = `${weekDays[0].getDate()} ${MONTHS_RU[weekDays[0].getMonth()].toLowerCase()} – ${weekDays[6].getDate()} ${MONTHS_RU[weekDays[6].getMonth()].toLowerCase()}`;
 
+  // Homework due today, tomorrow, or already overdue and still not turned
+  // in — "за сутки" (within a day of the deadline) at the day-level
+  // granularity `due` is stored at.
+  const tomorrowKey = (() => {
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + 1);
+    return dateKey(d);
+  })();
+  const urgentHomework = homework
+    .filter((h) => normalizeHomeworkStatus(h.status) === "assigned" && h.due && h.due <= tomorrowKey)
+    .sort((a, b) => a.due!.localeCompare(b.due!));
+
   function goPrevWeek() {
     setWeekCursor((c) => {
       const d = new Date(c);
@@ -310,6 +322,20 @@ export default function StudentPortal({ code, onExit }: Props) {
         ) : (
           <>
             <PageHeader title={profile ? `Здравствуйте, ${profile.firstName || profile.name}!` : "Личный кабинет"} />
+
+            {urgentHomework.length > 0 && (
+              <button
+                onClick={() => setTab("homework")}
+                className="w-full flex items-start gap-2 text-left text-sm bg-amber-50 text-amber-700 px-4 py-3 rounded-xl mb-5 hover:bg-amber-100 transition"
+              >
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <span>
+                  {urgentHomework.length === 1
+                    ? `Не сдано домашнее задание «${urgentHomework[0].title}», срок — ${fmtDateRu(urgentHomework[0].due)}.`
+                    : `Не сдано домашних заданий: ${urgentHomework.length}, ближайший срок — ${fmtDateRu(urgentHomework[0].due)}.`}
+                </span>
+              </button>
+            )}
 
             <div className="flex mb-5 border-b border-[#E7E9EE]">
               {TABS.map((t) => {
