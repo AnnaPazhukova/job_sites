@@ -282,3 +282,45 @@ end;
 $$;
 
 grant execute on function public.portal_mark_homework_done(text, text, jsonb) to anon, authenticated;
+
+-- Flags one of the link code's own lessons as having a pending cancellation
+-- request from the student — this never cancels the lesson by itself, the
+-- tutor still has to approve or decline it (see ScheduleView's request banner).
+create or replace function public.portal_request_lesson_cancel(p_code text, p_lesson_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tutor uuid;
+  v_student text;
+  v_value jsonb;
+  v_next jsonb;
+begin
+  select tutor_id, student_id into v_tutor, v_student
+  from public.student_invites where code = p_code;
+
+  if v_tutor is null then
+    raise exception 'Ссылка недействительна';
+  end if;
+
+  select value into v_value from public.app_kv where user_id = v_tutor and key = 'lessons';
+  if v_value is null then
+    return;
+  end if;
+
+  select coalesce(jsonb_agg(
+    case
+      when elem->>'id' = p_lesson_id and elem->>'studentId' = v_student
+      then jsonb_set(elem, '{cancelRequested}', 'true')
+      else elem
+    end
+  ), '[]'::jsonb) into v_next
+  from jsonb_array_elements(v_value) elem;
+
+  update public.app_kv set value = v_next, updated_at = now() where user_id = v_tutor and key = 'lessons';
+end;
+$$;
+
+grant execute on function public.portal_request_lesson_cancel(text, text) to anon, authenticated;

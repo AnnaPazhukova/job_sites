@@ -51,6 +51,8 @@ export interface Lesson {
   nextPlan?: string;
   /** Record of the lesson — e.g. a photo/PDF of the notes covered. */
   attachments?: Attachment[];
+  /** Student asked to cancel this lesson from their portal — awaiting the tutor's approve/decline. */
+  cancelRequested?: boolean;
 }
 
 // assigned: given to the student, not yet turned in.

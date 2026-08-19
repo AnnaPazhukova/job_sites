@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
-import { Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
+import { AlertTriangle, Calendar as CalendarIcon, CalendarClock, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
+import { Avatar, Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
   buildHomeworkAssignment,
   buildRecurringDates,
   dateKey,
+  fmtDateRu,
   isLessonPast,
   lessonLabel,
   lessonPillStyle,
@@ -156,6 +157,16 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
+  function approveCancelRequest(id: string) {
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false } : l)));
+    showToast("Занятие отменено");
+  }
+
+  function declineCancelRequest(id: string) {
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, cancelRequested: false } : l)));
+    showToast("Запрос на отмену отклонён");
+  }
+
   function moveLesson(id: string, date: string, time: string) {
     setLessons(lessons.map((l) => (l.id === id ? { ...l, date, time } : l)));
     showToast("Занятие перенесено");
@@ -229,6 +240,7 @@ export function ScheduleView({
   const dayLabel = `${cursor.getDate()} ${MONTHS_RU[cursor.getMonth()].toLowerCase()} ${cursor.getFullYear()}, ${WEEKDAYS_RU[(cursor.getDay() + 6) % 7]}`;
   const dayLessonCount = mode === "day" ? displayedLessons.filter((l) => l.date === dateKey(cursor) && l.status !== "cancelled").length : 0;
   const highlightDates = useMemo(() => new Set(displayedLessons.map((l) => l.date)), [displayedLessons]);
+  const cancelRequests = lessons.filter((l) => l.cancelRequested);
 
   return (
     <div>
@@ -320,6 +332,40 @@ export function ScheduleView({
           </span>
         )}
       </div>
+
+      {cancelRequests.length > 0 && (
+        <Card className="mb-4 divide-y divide-amber-100 border-amber-200 bg-amber-50/40">
+          <div className="px-4 sm:px-5 py-3 flex items-center gap-2 text-amber-700 text-sm font-semibold">
+            <AlertTriangle size={16} /> Запросы на отмену занятий
+          </div>
+          {cancelRequests.map((l) => {
+            const st = students.find((s) => s.id === l.studentId);
+            return (
+              <div key={l.id} className="flex items-center gap-3 px-4 sm:px-5 py-3 flex-wrap">
+                {st ? <Avatar id={st.id} name={st.name} size={34} color={st.color} /> : <div className="w-[34px]" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{lessonLabel(l, students)}</div>
+                  <div className="text-xs text-gray-500">
+                    {fmtDateRu(l.date)} · {l.time}
+                  </div>
+                </div>
+                <button
+                  onClick={() => declineCancelRequest(l.id)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Отклонить
+                </button>
+                <button
+                  onClick={() => approveCancelRequest(l.id)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                >
+                  <Check size={13} /> Принять
+                </button>
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       {students.length === 0 && groups.length === 0 && (
         <div className="mb-4 text-sm bg-amber-50 text-amber-700 px-4 py-2.5 rounded-xl">Добавьте учеников, чтобы планировать занятия</div>
