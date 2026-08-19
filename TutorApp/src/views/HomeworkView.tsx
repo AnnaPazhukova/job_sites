@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, BookOpen, Calendar, Check, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
+import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
@@ -35,6 +35,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
   const [showAdd, setShowAdd] = useState(false);
   const [editingHw, setEditingHw] = useState<Homework | null>(null);
   const [presetLesson, setPresetLesson] = useState<Lesson | null>(null);
+  const [showDone, setShowDone] = useState(false);
 
   const missingHwLessons = lessons
     .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !homework.some((h) => h.lessonId === l.id))
@@ -69,6 +70,77 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     setHomework([{ id: uid(), status: "assigned", ...data }, ...homework]);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");
+  }
+
+  function renderRow(h: Homework) {
+    const st = students.find((s) => s.id === h.studentId);
+    const meta = STATUS_META[effectiveStatus(h)];
+    const linkedNote = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
+    const linkedLesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
+    return (
+      <div
+        key={h.id}
+        onClick={() => setEditingHw(h)}
+        className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap cursor-pointer hover:bg-gray-50 transition"
+      >
+        {st ? <Avatar id={st.id} name={st.name} size={38} color={st.color} /> : <div className="w-[38px]" />}
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm truncate">{h.title}</div>
+          <div className="text-xs text-gray-500 truncate">
+            {h.studentName} · {h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}
+          </div>
+          {(linkedNote || linkedLesson || (h.attachments && h.attachments.length > 0)) && (
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {linkedNote && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNote(linkedNote.id);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB] hover:bg-blue-100 transition"
+                >
+                  <Layers size={11} /> {linkedNote.topic}
+                </button>
+              )}
+              {linkedLesson && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                  <Calendar size={11} /> урок {fmtDateRu(linkedLesson.date)}
+                </span>
+              )}
+              {h.attachments && h.attachments.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
+                  <Paperclip size={11} /> {h.attachments.length}
+                </span>
+              )}
+            </div>
+          )}
+          {h.reviewComment && (
+            <div className="flex items-start gap-1 mt-1.5 text-xs text-gray-500">
+              <MessageSquareText size={12} className="shrink-0 mt-0.5 text-gray-400" />
+              <span className="truncate">{h.reviewComment}</span>
+            </div>
+          )}
+        </div>
+        {h.grade != null && (
+          <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold shrink-0">
+            {h.grade}
+          </span>
+        )}
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
+        {normalizeHomeworkStatus(h.status) === "submitted" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              markDone(h.id);
+            }}
+            title="Отметить проверенным"
+            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 shrink-0"
+          >
+            <Check size={16} />
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -139,79 +211,35 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
           }
         />
       ) : (
-        <Card className="divide-y divide-[#F0F1F4]">
-          {filtered.map((h) => {
-            const st = students.find((s) => s.id === h.studentId);
-            const meta = STATUS_META[effectiveStatus(h)];
-            const linkedNote = h.noteId ? notes.find((n) => n.id === h.noteId) : null;
-            const linkedLesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : null;
-            return (
-              <div
-                key={h.id}
-                onClick={() => setEditingHw(h)}
-                className="flex items-center gap-3 px-4 sm:px-5 py-4 flex-wrap cursor-pointer hover:bg-gray-50 transition"
-              >
-                {st ? <Avatar id={st.id} name={st.name} size={38} color={st.color} /> : <div className="w-[38px]" />}
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-sm truncate">{h.title}</div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {h.studentName} · {h.due ? `срок до ${fmtDateRu(h.due)}` : "без срока"}
+        (() => {
+          // Already-reviewed work is rarely acted on again, so once the list mixes
+          // statuses it's folded into a collapsed block — keeps the page from
+          // growing forever with rows nobody needs to look at day to day.
+          const activeItems = filtered.filter((h) => normalizeHomeworkStatus(h.status) !== "done");
+          const doneItems = filtered.filter((h) => normalizeHomeworkStatus(h.status) === "done");
+          const collapseDone = statusFilter !== "done" && activeItems.length > 0;
+          return (
+            <>
+              {activeItems.length > 0 && <Card className="divide-y divide-[#F0F1F4]">{activeItems.map(renderRow)}</Card>}
+              {filtered.length === 0 && <Card className="py-10 text-center text-gray-400 text-sm">Ничего не найдено</Card>}
+              {doneItems.length > 0 &&
+                (collapseDone ? (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowDone((s) => !s)}
+                      className="w-full flex items-center justify-between px-1 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition"
+                    >
+                      <span>Проверено ({doneItems.length})</span>
+                      <ChevronDown size={16} className={`transition-transform ${showDone ? "rotate-180" : ""}`} />
+                    </button>
+                    {showDone && <Card className="divide-y divide-[#F0F1F4] mt-2">{doneItems.map(renderRow)}</Card>}
                   </div>
-                  {(linkedNote || linkedLesson || (h.attachments && h.attachments.length > 0)) && (
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      {linkedNote && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenNote(linkedNote.id);
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-blue-50 text-[#2563EB] hover:bg-blue-100 transition"
-                        >
-                          <Layers size={11} /> {linkedNote.topic}
-                        </button>
-                      )}
-                      {linkedLesson && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
-                          <Calendar size={11} /> урок {fmtDateRu(linkedLesson.date)}
-                        </span>
-                      )}
-                      {h.attachments && h.attachments.length > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600">
-                          <Paperclip size={11} /> {h.attachments.length}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {h.reviewComment && (
-                    <div className="flex items-start gap-1 mt-1.5 text-xs text-gray-500">
-                      <MessageSquareText size={12} className="shrink-0 mt-0.5 text-gray-400" />
-                      <span className="truncate">{h.reviewComment}</span>
-                    </div>
-                  )}
-                </div>
-                {h.grade != null && (
-                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#EEF2FF] text-[#2563EB] text-sm font-bold shrink-0">
-                    {h.grade}
-                  </span>
-                )}
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${meta.color}`}>{meta.label}</span>
-                {normalizeHomeworkStatus(h.status) === "submitted" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markDone(h.id);
-                    }}
-                    title="Отметить проверенным"
-                    className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 shrink-0"
-                  >
-                    <Check size={16} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {filtered.length === 0 && <div className="py-10 text-center text-gray-400 text-sm">Ничего не найдено</div>}
-        </Card>
+                ) : (
+                  <Card className={`divide-y divide-[#F0F1F4] ${activeItems.length > 0 ? "mt-4" : ""}`}>{doneItems.map(renderRow)}</Card>
+                ))}
+            </>
+          );
+        })()
       )}
 
       {showAdd && <AddHomeworkModal students={students} lessons={lessons} notes={notes} onClose={() => setShowAdd(false)} onSave={addHomework} />}

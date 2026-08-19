@@ -62,6 +62,9 @@ export function ScheduleView({
   const [addDate, setAddDate] = useState<Date | null>(null);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
   const [showTemplate, setShowTemplate] = useState(false);
+  const [studentFilter, setStudentFilter] = useState("");
+
+  const displayedLessons = studentFilter ? lessons.filter((l) => l.studentId === studentFilter) : lessons;
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -104,7 +107,7 @@ export function ScheduleView({
   function itemsOn(d: Date): DayItem[] {
     const key = dateKey(d);
     const gcalItems: DayItem[] = gcal.events.filter((e) => e.date === key).map((e) => ({ kind: "gcal", e }));
-    const lessonItems: DayItem[] = lessons.filter((l) => l.date === key).map((l) => ({ kind: "lesson", l }));
+    const lessonItems: DayItem[] = displayedLessons.filter((l) => l.date === key).map((l) => ({ kind: "lesson", l }));
     return [...gcalItems, ...lessonItems];
   }
 
@@ -241,6 +244,20 @@ export function ScheduleView({
             <button onClick={() => setCursor(TODAY)} className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition">
               Сегодня
             </button>
+            {students.length > 0 && (
+              <select
+                value={studentFilter}
+                onChange={(e) => setStudentFilter(e.target.value)}
+                className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:border-gray-400 transition"
+              >
+                <option value="">Все ученики</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="flex items-center bg-white border border-gray-300 shadow-sm rounded-xl">
               <button onClick={goPrev} className="p-2 hover:bg-gray-50 rounded-l-xl">
                 <ChevronLeft size={16} />
@@ -347,7 +364,7 @@ export function ScheduleView({
         <Card className="overflow-hidden">
           <WeekView
             cursor={cursor}
-            lessons={lessons}
+            lessons={displayedLessons}
             students={students}
             gcalEvents={gcal.events}
             onDayClick={openAdd}
