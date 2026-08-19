@@ -11,7 +11,6 @@ import {
   lessonLabel,
   lessonPillStyle,
   MONTHS_RU,
-  pluralRu,
   TODAY,
   WEEKDAYS_RU,
   uid,
@@ -55,7 +54,7 @@ export function ScheduleView({
   notes,
   showToast,
 }: Props) {
-  const [mode, setMode] = useState<"month" | "week" | "day">("month");
+  const [mode, setMode] = useState<"month" | "week">("week");
   const [cursor, setCursor] = useState(TODAY);
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<Date | null>(null);
@@ -85,7 +84,7 @@ export function ScheduleView({
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
 
   const rangeStartISO = useMemo(() => {
-    const base = mode === "month" ? cells[0]?.date : mode === "week" ? getWeekDays(cursor)[0] : cursor;
+    const base = mode === "month" ? cells[0]?.date : getWeekDays(cursor)[0];
     const d = new Date(base || cursor);
     d.setDate(d.getDate() - 1);
     d.setHours(0, 0, 0, 0);
@@ -93,7 +92,7 @@ export function ScheduleView({
   }, [mode, cells, cursor]);
 
   const rangeEndISO = useMemo(() => {
-    const base = mode === "month" ? cells[cells.length - 1]?.date : mode === "week" ? getWeekDays(cursor)[6] : cursor;
+    const base = mode === "month" ? cells[cells.length - 1]?.date : getWeekDays(cursor)[6];
     const d = new Date(base || cursor);
     d.setDate(d.getDate() + 2);
     d.setHours(0, 0, 0, 0);
@@ -152,6 +151,12 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
+  function deleteLessonEdit(id: string) {
+    setLessons(lessons.filter((l) => l.id !== id));
+    showToast("Занятие удалено");
+    setEditLesson(null);
+  }
+
   function approveCancelRequest(id: string) {
     setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false } : l)));
     showToast("Занятие отменено");
@@ -183,15 +188,11 @@ export function ScheduleView({
   }
 
   function goPrev() {
-    if (mode === "month") setCursor(new Date(year, month - 1, 1));
-    else if (mode === "week") setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
-    else setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 1));
+    setCursor(mode === "month" ? new Date(year, month - 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7));
   }
 
   function goNext() {
-    if (mode === "month") setCursor(new Date(year, month + 1, 1));
-    else if (mode === "week") setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7));
-    else setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1));
+    setCursor(mode === "month" ? new Date(year, month + 1, 1) : new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7));
   }
 
   const weekDays = mode === "week" ? getWeekDays(cursor) : [];
@@ -199,8 +200,6 @@ export function ScheduleView({
     mode === "week" && weekDays.length
       ? `${weekDays[0].getDate()} ${MONTHS_RU[weekDays[0].getMonth()].toLowerCase()} – ${weekDays[6].getDate()} ${MONTHS_RU[weekDays[6].getMonth()].toLowerCase()}`
       : "";
-  const dayLabel = `${cursor.getDate()} ${MONTHS_RU[cursor.getMonth()].toLowerCase()} ${cursor.getFullYear()}, ${WEEKDAYS_RU[(cursor.getDay() + 6) % 7]}`;
-  const dayLessonCount = mode === "day" ? displayedLessons.filter((l) => l.date === dateKey(cursor) && l.status !== "cancelled").length : 0;
   const highlightDates = useMemo(() => new Set(displayedLessons.map((l) => l.date)), [displayedLessons]);
   const cancelRequests = lessons.filter((l) => l.cancelRequested);
   const missingRecordLessons = lessons
@@ -225,12 +224,6 @@ export function ScheduleView({
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "week" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
               >
                 Неделя
-              </button>
-              <button
-                onClick={() => setMode("day")}
-                className={`px-3 py-1.5 rounded-lg font-medium transition ${mode === "day" ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"}`}
-              >
-                День
               </button>
             </div>
             <button onClick={() => setCursor(TODAY)} className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition">
@@ -282,12 +275,7 @@ export function ScheduleView({
         }
       />
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="text-xl font-bold">{mode === "month" ? `${MONTHS_RU[month]} ${year}` : mode === "week" ? weekLabel : dayLabel}</div>
-        {mode === "day" && (
-          <span className="text-sm font-medium text-gray-500">
-            · {dayLessonCount} {pluralRu(dayLessonCount, ["занятие", "занятия", "занятий"])}
-          </span>
-        )}
+        <div className="text-xl font-bold">{mode === "month" ? `${MONTHS_RU[month]} ${year}` : weekLabel}</div>
       </div>
 
       {cancelRequests.length > 0 && (
@@ -318,33 +306,6 @@ export function ScheduleView({
                 >
                   <Check size={13} /> Принять
                 </button>
-              </div>
-            );
-          })}
-        </Card>
-      )}
-
-      {missingRecordLessons.length > 0 && (
-        <Card className="mb-4 divide-y divide-amber-100 border-amber-200 bg-amber-50/40">
-          <div className="px-4 sm:px-5 py-3 flex items-center gap-2 text-amber-700 text-sm font-semibold">
-            <AlertTriangle size={16} /> Нет записи или комментария после урока
-          </div>
-          {missingRecordLessons.map((l) => {
-            const st = students.find((s) => s.id === l.studentId);
-            return (
-              <div
-                key={l.id}
-                onClick={() => setEditLesson(l)}
-                className="flex items-center gap-3 px-4 sm:px-5 py-3 cursor-pointer hover:bg-amber-50 transition"
-              >
-                {st ? <Avatar id={st.id} name={st.name} size={34} color={st.color} /> : <div className="w-[34px]" />}
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">{lessonLabel(l, students)}</div>
-                  <div className="text-xs text-gray-500">
-                    {fmtDateRu(l.date)} · {l.time}
-                  </div>
-                </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 shrink-0">Заполнить</span>
               </div>
             );
           })}
@@ -414,22 +375,10 @@ export function ScheduleView({
             })}
           </div>
         </Card>
-      ) : mode === "week" ? (
-        <Card className="overflow-hidden">
-          <WeekView
-            cursor={cursor}
-            lessons={displayedLessons}
-            students={students}
-            gcalEvents={gcal.events}
-            onDayClick={openAdd}
-            onLessonClick={setEditLesson}
-          />
-        </Card>
       ) : (
         <Card className="overflow-hidden">
           <WeekView
             cursor={cursor}
-            days={[cursor]}
             lessons={displayedLessons}
             students={students}
             gcalEvents={gcal.events}
@@ -440,8 +389,27 @@ export function ScheduleView({
       )}
       </div>
 
-      <div className="hidden lg:block w-72 shrink-0">
-        <MiniCalendar selected={cursor} highlightDates={highlightDates} onSelect={setCursor} />
+      <div className="hidden lg:block w-72 shrink-0 space-y-4">
+        {mode === "week" && <MiniCalendar selected={cursor} highlightDates={highlightDates} onSelect={setCursor} />}
+        {missingRecordLessons.length > 0 && (
+          <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-3.5 py-2.5 flex items-center gap-1.5 text-amber-700 text-xs font-semibold bg-amber-50/60 border-b border-amber-100">
+              <AlertTriangle size={13} /> Нет записи ({missingRecordLessons.length})
+            </div>
+            <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+              {missingRecordLessons.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => setEditLesson(l)}
+                  className="w-full text-left px-3.5 py-2 hover:bg-amber-50 transition"
+                >
+                  <div className="text-xs font-medium text-gray-800 truncate">{lessonLabel(l, students)}</div>
+                  <div className="text-[11px] text-gray-500">{fmtDateRu(l.date)}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       </div>
 
@@ -467,6 +435,7 @@ export function ScheduleView({
               onClose={() => setEditLesson(null)}
               onSave={saveLessonEdit}
               onCancelLesson={() => cancelLessonEdit(editLesson.id)}
+              onDeleteLesson={() => deleteLessonEdit(editLesson.id)}
               onMoveLesson={(date, time) => moveLesson(editLesson.id, date, time)}
               onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
               onNextLesson={next ? () => setEditLesson(next) : undefined}

@@ -18,6 +18,7 @@ import {
   School,
   Star,
   Target,
+  Trash2,
   User,
   Users,
   Wallet,
@@ -195,6 +196,13 @@ export function StudentDetailPage({
   function cancelLesson(id: string) {
     setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)));
     showToast("Занятие отменено");
+    setShowLessonForm(false);
+    setEditLesson(null);
+  }
+
+  function deleteLesson(id: string) {
+    setLessons(lessons.filter((l) => l.id !== id));
+    showToast("Занятие удалено");
     setShowLessonForm(false);
     setEditLesson(null);
   }
@@ -567,6 +575,7 @@ export function StudentDetailPage({
               }}
               onSave={saveLesson}
               onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
+              onDeleteLesson={editLesson ? () => deleteLesson(editLesson.id) : undefined}
               onMoveLesson={editLesson ? (date, time) => moveLesson(editLesson.id, date, time) : undefined}
               onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
               onNextLesson={next ? () => setEditLesson(next) : undefined}
@@ -611,6 +620,8 @@ interface LessonFormProps {
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
   onCancelLesson: (() => void) | null;
+  /** Permanently removes this lesson (unlike onCancelLesson, which just marks it cancelled). */
+  onDeleteLesson?: () => void;
   /** Reschedules just this lesson instance (by date+time) — never touches other lessons in a recurring series. */
   onMoveLesson?: (date: string, time: string) => void;
   /** Adjacent lessons for the same student — set to switch the modal to that lesson without closing it. */
@@ -631,6 +642,7 @@ export function LessonFormModal({
   onClose,
   onSave,
   onCancelLesson,
+  onDeleteLesson,
   onMoveLesson,
   onPrevLesson,
   onNextLesson,
@@ -723,6 +735,17 @@ export function LessonFormModal({
       onClose={onClose}
       wide={!isPast}
       full={isPast}
+      headerActions={
+        isEdit && onDeleteLesson ? (
+          <button
+            onClick={() => window.confirm("Удалить это занятие насовсем? Это действие нельзя отменить.") && onDeleteLesson()}
+            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+            title="Удалить занятие"
+          >
+            <Trash2 size={18} />
+          </button>
+        ) : undefined
+      }
     >
       {isEdit && (
         <div className="flex items-center gap-2 mb-5 flex-wrap">
@@ -932,7 +955,7 @@ export function LessonFormModal({
               Закрыть
             </GhostButton>
             {isEdit && onCancelLesson && (
-              <GhostButton full danger onClick={() => window.confirm("Отменить это занятие?") && onCancelLesson()}>
+              <GhostButton full danger onClick={onCancelLesson}>
                 Отменить занятие
               </GhostButton>
             )}
