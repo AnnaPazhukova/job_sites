@@ -17,7 +17,7 @@ import {
   type RecurrenceEnd,
   type RecurrenceFreq,
 } from "../lib/utils";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student } from "../lib/types";
+import type { Attachment, Group, Homework, Lesson, MessagesByStudent, MethodNote, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { MiniCalendar } from "../components/MiniCalendar";
@@ -176,10 +176,10 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
-  function handleAssignHomework(title: string, noteId?: string) {
+  function handleAssignHomework(title: string, noteId?: string, due?: string, attachments?: Attachment[]) {
     if (!editLesson || !editLesson.studentId) return;
     const st = students.find((s) => s.id === editLesson.studentId);
-    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons);
+    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons, { due, attachments });
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
     showToast("Домашнее задание задано");

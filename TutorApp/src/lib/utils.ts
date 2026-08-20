@@ -1,4 +1,4 @@
-import type { ChatMessage, Homework, HomeworkStatus, Lesson, Student } from "./types";
+import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, Student } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -152,9 +152,10 @@ export function buildHomeworkAssignment(
   lesson: Lesson,
   studentName: string,
   title: string,
-  lessons: Lesson[]
+  lessons: Lesson[],
+  opts?: { due?: string; attachments?: Attachment[] }
 ): { homework: Homework; message: ChatMessage } {
-  const due = nextLessonDate(lessons, lesson.studentId!, lesson.date, lesson.time);
+  const due = opts?.due || nextLessonDate(lessons, lesson.studentId!, lesson.date, lesson.time);
   const homework: Homework = {
     id: uid(),
     studentId: lesson.studentId!,
@@ -164,6 +165,7 @@ export function buildHomeworkAssignment(
     status: "assigned",
     lessonId: lesson.id,
     noteId: lesson.noteId,
+    attachments: opts?.attachments?.length ? opts.attachments : undefined,
   };
   const message: ChatMessage = {
     id: uid(),
