@@ -66,9 +66,14 @@ interface Props {
   gcalEvents?: GcalEvent[];
   onDayClick: (date: Date) => void;
   onLessonClick: (lesson: Lesson) => void;
+  // The tutor's own schedule pushes cancelled lessons into a slim edge lane
+  // so the freed slot reads as bookable. The student portal has no booking
+  // action to make room for, so it shows cancellations the classic way
+  // instead — grayed out and struck through, sitting in their normal slot.
+  classicCancelled?: boolean;
 }
 
-export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick }: Props) {
+export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick, classicCancelled = false }: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -186,8 +191,8 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
           </div>
           {days.map((d, i) => {
             const key = dateKey(d);
-            const dayLessons = lessons.filter((l) => l.date === key && l.status !== "cancelled");
-            const cancelledDayLessons = lessons.filter((l) => l.date === key && l.status === "cancelled");
+            const dayLessons = lessons.filter((l) => l.date === key && (classicCancelled || l.status !== "cancelled"));
+            const cancelledDayLessons = classicCancelled ? [] : lessons.filter((l) => l.date === key && l.status === "cancelled");
             const dayGcalTimed = gcalEvents.filter((e) => e.date === key && !e.allDay && e.time);
             const todayCol = isToday(d);
             const cancelledLaneWidth = cancelledDayLessons.length > 0 ? 14 : 0;
@@ -248,7 +253,10 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                     }
 
                     const l = p.lesson;
-                    const appearance = lessonAppearance(l);
+                    const cancelled = l.status === "cancelled";
+                    const appearance = cancelled
+                      ? { className: "bg-gray-100 text-gray-400 line-through hover:bg-gray-200", style: undefined }
+                      : lessonAppearance(l);
                     const hasCustomColor = !!appearance.style;
                     return (
                       <button
