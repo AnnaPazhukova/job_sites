@@ -240,7 +240,15 @@ export default function App({ userEmail, onSignOut }: AppProps) {
               )}
               {view === "tasks" && <TasksView tasks={tasks} saveTasks={saveTasks} showToast={showToast} />}
               {view === "notes" && (
-                <NotesView notes={notes} saveNotes={saveNotes} tasks={tasks} showToast={showToast} activeId={activeNoteId} setActiveId={setActiveNoteId} />
+                <NotesView
+                  notes={notes}
+                  saveNotes={saveNotes}
+                  tasks={tasks}
+                  homework={homework}
+                  showToast={showToast}
+                  activeId={activeNoteId}
+                  setActiveId={setActiveNoteId}
+                />
               )}
               {view === "stats" && <StatsView lessons={lessons} students={students} homework={homework} tasks={tasks} notes={notes} setView={setView} />}
             </>

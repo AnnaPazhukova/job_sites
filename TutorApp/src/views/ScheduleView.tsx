@@ -104,7 +104,10 @@ export function ScheduleView({
   function itemsOn(d: Date): DayItem[] {
     const key = dateKey(d);
     const gcalItems: DayItem[] = gcal.events.filter((e) => e.date === key).map((e) => ({ kind: "gcal", e }));
-    const lessonItems: DayItem[] = displayedLessons.filter((l) => l.date === key).map((l) => ({ kind: "lesson", l }));
+    const lessonItems = displayedLessons.filter((l) => l.date === key).map((l) => ({ kind: "lesson" as const, l }));
+    // Cancelled lessons free up their slot for rebooking, so they shouldn't
+    // crowd out real bookings in the day cell's 2-item preview.
+    lessonItems.sort((a, b) => Number(a.l.status === "cancelled") - Number(b.l.status === "cancelled"));
     return [...gcalItems, ...lessonItems];
   }
 
