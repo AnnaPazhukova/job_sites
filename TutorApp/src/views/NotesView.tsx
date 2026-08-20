@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, Layers, ListPlus, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Check, GripVertical, Layers, ListPlus, Plus, Search, Trash2, X } from "lucide-react";
 import { Card, GhostButton, Modal, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
-import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
 
 const subjectsForGrade = (grade: string) => {
@@ -474,10 +473,13 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
 
   const [activeTab, setActiveTab] = useState<MethodNoteTabKey>("theory");
   const [draftTabs, setDraftTabs] = useState<MethodNoteTabs>(getTabs(active));
+  const [editingTopic, setEditingTopic] = useState(false);
+  const [topicDraft, setTopicDraft] = useState("");
 
   useEffect(() => {
     setDraftTabs(getTabs(active));
     setActiveTab("theory");
+    setEditingTopic(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -515,47 +517,19 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     showToast("Заметка сохранена");
   };
 
-  const starterForActive = active ? STARTER_CONTENT[`${active.grade}|${displaySubject(active.subject)}|${active.topic}`] : undefined;
-
-  const handleFillStarter = () => {
-    if (!active || !starterForActive) return;
-    const next: MethodNoteTabs = { ...draftTabs };
-    (Object.keys(starterForActive) as MethodNoteTabKey[]).forEach((k) => {
-      const value = starterForActive[k];
-      if (value && !next[k]?.trim()) next[k] = value;
-    });
-    setDraftTabs(next);
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, tabs: next, updatedAt: Date.now() } : n)));
-    showToast("Вкладки заполнены типовым текстом");
+  const startEditTopic = () => {
+    if (!active) return;
+    setTopicDraft(active.topic);
+    setEditingTopic(true);
   };
 
-  const handleFillAllStarter = () => {
-    const filteredIds = new Set(filteredNotes.map((n) => n.id));
-    let filledCount = 0;
-    const next = notes.map((n) => {
-      if (!filteredIds.has(n.id)) return n;
-      const starter = STARTER_CONTENT[`${n.grade}|${displaySubject(n.subject)}|${n.topic}`];
-      if (!starter) return n;
-      const nextTabs: MethodNoteTabs = { ...getTabs(n) };
-      let changed = false;
-      (Object.keys(starter) as MethodNoteTabKey[]).forEach((k) => {
-        const value = starter[k];
-        if (value && !nextTabs[k]?.trim()) {
-          nextTabs[k] = value;
-          changed = true;
-        }
-      });
-      if (!changed) return n;
-      filledCount++;
-      return { ...n, tabs: nextTabs, updatedAt: Date.now() };
-    });
-    if (filledCount === 0) {
-      showToast("Нечего заполнять: в текущем списке нет тем с типовым текстом");
-      return;
-    }
-    saveNotes(next);
-    if (active) setDraftTabs(getTabs(next.find((n) => n.id === active.id) || null));
-    showToast(`Заполнено тем: ${filledCount}`);
+  const handleRenameTopic = () => {
+    if (!active) return;
+    const next = topicDraft.trim();
+    setEditingTopic(false);
+    if (!next || next === active.topic) return;
+    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, topic: next, updatedAt: Date.now() } : n)));
+    showToast("Название темы обновлено");
   };
 
   const handleAttachmentsChange = (tabKey: MethodNoteTabKey, next: Attachment[]) => {
@@ -617,9 +591,6 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           <div className="w-44">
             <Select value={subjectFilter} onChange={setSubjectFilter} options={["Все предметы", ...ALL_SUBJECTS]} />
           </div>
-          <GhostButton icon={Sparkles} onClick={handleFillAllStarter} disabled={filteredNotes.length === 0}>
-            Заполнить всё типовым текстом
-          </GhostButton>
         </div>
       </Card>
 
@@ -727,22 +698,33 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           {active ? (
             <Card className="p-5">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-lg">{active.topic}</h3>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  {editingTopic ? (
+                    <TextInput
+                      autoFocus
+                      value={topicDraft}
+                      onChange={(e) => setTopicDraft(e.target.value)}
+                      onBlur={handleRenameTopic}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameTopic();
+                        if (e.key === "Escape") setEditingTopic(false);
+                      }}
+                      className="font-bold text-lg py-1"
+                    />
+                  ) : (
+                    <h3
+                      className="font-bold text-lg cursor-text hover:bg-gray-50 rounded px-1 -mx-1"
+                      onClick={startEditTopic}
+                      title="Нажмите, чтобы переименовать тему"
+                    >
+                      {active.topic}
+                    </h3>
+                  )}
                   {active.grade && <Pill tone="level">{active.grade}</Pill>}
                   {active.subject && <Pill>{displaySubject(active.subject)}</Pill>}
                 </div>
                 <div className="flex items-center gap-2">
                   {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
-                  {starterForActive && (
-                    <button
-                      onClick={handleFillStarter}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition"
-                      title="Подставить типовой текст учебника в пустые вкладки"
-                    >
-                      <Sparkles size={13} /> Заполнить типовым текстом
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       if (window.confirm(`Удалить тему «${active.topic}»?`)) handleDelete(active.id);
