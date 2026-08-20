@@ -214,10 +214,10 @@ export function StudentDetailPage({
     setEditLesson(null);
   }
 
-  function handleAssignHomework(title: string, noteId?: string) {
+  function handleAssignHomework(title: string, noteId?: string, due?: string, attachments?: Attachment[]) {
     if (!editLesson || !editLesson.studentId) return;
     const st = students.find((s) => s.id === editLesson.studentId);
-    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons);
+    const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons, { due, attachments });
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
     showToast("Домашнее задание задано");
@@ -615,7 +615,7 @@ interface LessonFormProps {
   lesson: Lesson | null;
   homework?: Homework[];
   notes?: MethodNote[];
-  onAssignHomework?: (title: string, noteId?: string) => void;
+  onAssignHomework?: (title: string, noteId?: string, due?: string, attachments?: Attachment[]) => void;
   onUpdateHomework?: (id: string, patch: Partial<Homework>) => void;
   onClose: () => void;
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
@@ -658,9 +658,12 @@ export function LessonFormModal({
   const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
   const [hwText, setHwText] = useState("");
+  const [hwDue, setHwDue] = useState("");
+  const [hwAttachments, setHwAttachments] = useState<Attachment[]>([]);
   const [editingHw, setEditingHw] = useState(false);
   const [hwEditText, setHwEditText] = useState("");
   const [hwEditDue, setHwEditDue] = useState("");
+  const [hwEditAttachments, setHwEditAttachments] = useState<Attachment[]>([]);
   const [recurring, setRecurring] = useState(false);
   const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
   const [days, setDays] = useState<number[]>([]);
@@ -708,8 +711,10 @@ export function LessonFormModal({
     if (isEdit && noteId !== (lesson?.noteId || "")) {
       onSave({ id: lesson!.id, noteId: noteId || undefined });
     }
-    onAssignHomework(hwText.trim(), noteId || undefined);
+    onAssignHomework(hwText.trim(), noteId || undefined, hwDue || undefined, hwAttachments);
     setHwText("");
+    setHwDue("");
+    setHwAttachments([]);
   }
 
   function useNoteHomework() {
@@ -720,12 +725,13 @@ export function LessonFormModal({
     if (!linkedHomework) return;
     setHwEditText(linkedHomework.title);
     setHwEditDue(linkedHomework.due || "");
+    setHwEditAttachments(linkedHomework.attachments || []);
     setEditingHw(true);
   }
 
   function saveHwEdit() {
     if (!linkedHomework || !onUpdateHomework || !hwEditText.trim()) return;
-    onUpdateHomework(linkedHomework.id, { title: hwEditText.trim(), due: hwEditDue || null });
+    onUpdateHomework(linkedHomework.id, { title: hwEditText.trim(), due: hwEditDue || null, attachments: hwEditAttachments });
     setEditingHw(false);
   }
 
@@ -878,6 +884,7 @@ export function LessonFormModal({
                       <Field label="Срок сдачи">
                         <TextInput type="date" value={hwEditDue} onChange={(e) => setHwEditDue(e.target.value)} />
                       </Field>
+                      <AttachmentsField attachments={hwEditAttachments} onChange={setHwEditAttachments} label="Файлы к заданию" />
                       <div className="flex gap-2">
                         <GhostButton full onClick={() => setEditingHw(false)}>
                           Отмена
@@ -918,11 +925,15 @@ export function LessonFormModal({
                       </button>
                     )}
                     <TextArea value={hwText} onChange={(e) => setHwText(e.target.value)} rows={5} placeholder="Что задать на дом..." />
+                    <Field label="Срок сдачи">
+                      <TextInput type="date" value={hwDue} onChange={(e) => setHwDue(e.target.value)} />
+                    </Field>
+                    <AttachmentsField attachments={hwAttachments} onChange={setHwAttachments} label="Файлы к заданию" />
                     <GhostButton icon={BookOpen} onClick={assignHomework} disabled={!hwText.trim()}>
                       Задать домашнее задание
                     </GhostButton>
                     <div className="text-xs text-gray-400">
-                      Срок — до следующего занятия. Задание сразу появится в переписке с учеником.
+                      Если не указать срок — по умолчанию до следующего занятия. Задание сразу появится в переписке с учеником.
                     </div>
                   </div>
                 )}
