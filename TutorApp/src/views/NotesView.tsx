@@ -22,10 +22,15 @@ function displaySubject(subject: string): string {
 }
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
-// All five sections render stacked on one page (with their own attachments
-// inline) rather than behind switchable tabs — a tutor wants theory, rules,
-// tasks, test and homework all visible together while teaching the lesson.
-const TAB_ORDER: MethodNoteTabKey[] = ["theory", "rules", "tasks", "test", "homework"];
+// Four tabs: Theory and Rules are grouped into one ("read together while
+// teaching the lesson"), Tasks/Test/Homework stay on their own tab each
+// (only one is relevant at a time, e.g. during the check or when assigning).
+const TAB_GROUPS: { id: string; label: string; keys: MethodNoteTabKey[] }[] = [
+  { id: "theory_rules", label: "Теория и правила", keys: ["theory", "rules"] },
+  { id: "tasks", label: "Задания", keys: ["tasks"] },
+  { id: "test", label: "Тест", keys: ["test"] },
+  { id: "homework", label: "Д/З", keys: ["homework"] },
+];
 const TAB_LABELS: Record<MethodNoteTabKey, string> = {
   theory: "Теория",
   rules: "Правила",
@@ -80,11 +85,13 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
   const active = notes.find((n) => n.id === activeId) || null;
 
   const [draftTabs, setDraftTabs] = useState<MethodNoteTabs>(getTabs(active));
+  const [activeGroup, setActiveGroup] = useState(TAB_GROUPS[0].id);
   const [editingTopic, setEditingTopic] = useState(false);
   const [topicDraft, setTopicDraft] = useState("");
 
   useEffect(() => {
     setDraftTabs(getTabs(active));
+    setActiveGroup(TAB_GROUPS[0].id);
     setEditingTopic(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -398,11 +405,27 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                 </div>
               </div>
 
-              {TAB_ORDER.map((tab, i) => {
+              <div className="flex gap-1 mb-4 border-b border-[#F0F1F4] overflow-x-auto">
+                {TAB_GROUPS.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => setActiveGroup(g.id)}
+                    className={`px-3.5 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
+                      activeGroup === g.id ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+
+              {(TAB_GROUPS.find((g) => g.id === activeGroup) || TAB_GROUPS[0]).keys.map((tab, i) => {
                 const files = active.attachments?.[tab] || [];
                 return (
                   <div key={tab} className={`mb-5 ${i > 0 ? "pt-5 border-t border-[#F0F1F4]" : ""}`}>
-                    <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>
+                    {(TAB_GROUPS.find((g) => g.id === activeGroup)?.keys.length ?? 1) > 1 && (
+                      <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>
+                    )}
                     <TextArea
                       className="min-h-[160px] text-sm"
                       placeholder={TAB_PLACEHOLDERS[tab]}
