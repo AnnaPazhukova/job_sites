@@ -195,6 +195,16 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
     saveNotes(notes.map((n) => (n.id === active.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
   };
 
+  // Theory and Rules share one file zone (they're read together on the same
+  // tab) — everything is stored under the "theory" key; "rules" is dropped
+  // so old per-section attachments don't linger as an invisible duplicate.
+  const handleTheoryRulesAttachmentsChange = (next: Attachment[]) => {
+    if (!active) return;
+    const { rules: _rulesFiles, ...restAttachments } = active.attachments || {};
+    const nextAttachments: MethodNoteAttachments = { ...restAttachments, theory: next };
+    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
+  };
+
   const handleDelete = (id: string) => {
     const next = notes.filter((n) => n.id !== id);
     saveNotes(next);
@@ -419,54 +429,61 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                 ))}
               </div>
 
-              {(TAB_GROUPS.find((g) => g.id === activeGroup) || TAB_GROUPS[0]).keys.map((tab, i) => {
-                const files = active.attachments?.[tab] || [];
+              {(() => {
+                const group = TAB_GROUPS.find((g) => g.id === activeGroup) || TAB_GROUPS[0];
+                const isTheoryRules = group.id === "theory_rules";
+                const sharedFiles = isTheoryRules
+                  ? [...(active.attachments?.theory || []), ...(active.attachments?.rules || [])]
+                  : active.attachments?.[group.keys[0]] || [];
                 return (
-                  <div key={tab} className={`mb-5 ${i > 0 ? "pt-5 border-t border-[#F0F1F4]" : ""}`}>
-                    {(TAB_GROUPS.find((g) => g.id === activeGroup)?.keys.length ?? 1) > 1 && (
-                      <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>
-                    )}
-                    <TextArea
-                      className="min-h-[160px] text-sm"
-                      placeholder={TAB_PLACEHOLDERS[tab]}
-                      value={draftTabs[tab]}
-                      onChange={(e) => setDraftTabs((t) => ({ ...t, [tab]: e.target.value }))}
-                      onBlur={handleSaveDraft}
-                    />
-                    {tab === "homework" && topicHomework.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                          {topicHomework
-                            .slice()
-                            .reverse()
-                            .map((h) => (
-                              <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
-                                <div className="min-w-0">
-                                  <div className="font-medium text-gray-700 truncate">{h.title}</div>
-                                  <div className="text-gray-400">{h.studentName}</div>
-                                </div>
-                                <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
-                              </div>
-                            ))}
+                  <>
+                    {group.keys.map((tab, i) => (
+                      <div key={tab} className={i > 0 ? "mt-5 pt-5 border-t border-[#F0F1F4]" : ""}>
+                        {group.keys.length > 1 && <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>}
+                        <TextArea
+                          className="min-h-[160px] text-sm"
+                          placeholder={TAB_PLACEHOLDERS[tab]}
+                          value={draftTabs[tab]}
+                          onChange={(e) => setDraftTabs((t) => ({ ...t, [tab]: e.target.value }))}
+                          onBlur={handleSaveDraft}
+                        />
+                        {tab === "homework" && topicHomework.length > 0 && (
+                          <div className="mt-3">
+                            <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                              {topicHomework
+                                .slice()
+                                .reverse()
+                                .map((h) => (
+                                  <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
+                                    <div className="min-w-0">
+                                      <div className="font-medium text-gray-700 truncate">{h.title}</div>
+                                      <div className="text-gray-400">{h.studentName}</div>
+                                    </div>
+                                    <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="mt-5 pt-5 border-t border-[#F0F1F4]">
+                      {sharedFiles.length > 0 && (
+                        <div className="mb-3">
+                          <LargeAttachmentList attachments={sharedFiles} />
                         </div>
-                      </div>
-                    )}
-                    {files.length > 0 && (
-                      <div className="mt-3">
-                        <LargeAttachmentList attachments={files} />
-                      </div>
-                    )}
-                    <div className="mt-3">
+                      )}
                       <AttachmentsField
-                        attachments={files}
-                        onChange={(next) => handleAttachmentsChange(tab, next)}
-                        label={`Файлы к разделу «${TAB_LABELS[tab]}»`}
+                        attachments={sharedFiles}
+                        onChange={isTheoryRules ? handleTheoryRulesAttachmentsChange : (next) => handleAttachmentsChange(group.keys[0], next)}
+                        label={isTheoryRules ? "Файлы к теории и правилам" : `Файлы к разделу «${group.label}»`}
                       />
                     </div>
-                  </div>
+                  </>
                 );
-              })}
+              })()}
 
               <div className="flex justify-end mt-4">
                 <PrimaryButton icon={Check} onClick={handleSaveDraft}>
