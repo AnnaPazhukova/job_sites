@@ -674,13 +674,14 @@ function RecordTab({ lesson }: { lesson: Lesson }) {
 }
 
 function InfoTab({ lesson, note }: { lesson: Lesson; note?: MethodNote }) {
-  const tasks = note?.tabs?.tasks?.trim();
-  const tasksAttachments = note?.attachments?.tasks ?? [];
   const theory = note?.tabs?.theory?.trim();
   const theoryAttachments = note?.attachments?.theory ?? [];
   const rules = note?.tabs?.rules?.trim();
   const rulesAttachments = note?.attachments?.rules ?? [];
-  const nothing = !lesson.comment && !lesson.nextPlan && !note;
+  // "Задания" is deliberately left out here — students shouldn't see the
+  // task list ahead of the tutor assigning it as homework.
+  const hasNoteContent = !!theory || theoryAttachments.length > 0 || !!rules || rulesAttachments.length > 0;
+  const nothing = !lesson.comment && !lesson.nextPlan && !hasNoteContent;
 
   if (nothing) {
     return <div className="py-14 text-center text-gray-400 text-sm">Преподаватель пока не заполнил информацию об уроке</div>;
@@ -702,19 +703,12 @@ function InfoTab({ lesson, note }: { lesson: Lesson; note?: MethodNote }) {
         </div>
       )}
 
-      {note && (
+      {note && hasNoteContent && (
         <div>
           <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-2">
             <Layers size={15} className="text-gray-400" /> {note.topic}
           </div>
           <div className="space-y-3">
-            {(tasks || tasksAttachments.length > 0) && (
-              <div className="px-3.5 py-3 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE]">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Задания</div>
-                {tasks && <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{tasks}</div>}
-                {tasksAttachments.length > 0 && <AttachmentList attachments={tasksAttachments} />}
-              </div>
-            )}
             {(theory || theoryAttachments.length > 0) && (
               <div className="px-3.5 py-3 rounded-xl bg-emerald-50 border border-emerald-100">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-1">Теория</div>
