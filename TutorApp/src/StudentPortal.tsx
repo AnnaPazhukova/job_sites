@@ -3,7 +3,7 @@ import { Bell, BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRigh
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { adjacentLessons, dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -489,23 +489,31 @@ export default function StudentPortal({ code, onExit }: Props) {
         )}
       </main>
 
-      {openDetail && (
-        <LessonDetailModal
-          code={code}
-          lesson={openDetail.lesson}
-          homework={openDetail.homework}
-          note={
-            openDetail.homework?.noteId
-              ? notes.find((n) => n.id === openDetail.homework!.noteId)
-              : openDetail.lesson?.noteId
-                ? notes.find((n) => n.id === openDetail.lesson!.noteId)
-                : undefined
-          }
-          initialTab={openDetail.initialTab}
-          onSubmitHomework={submitHomework}
-          onClose={() => setOpenDetail(null)}
-        />
-      )}
+      {openDetail &&
+        (() => {
+          const { prev, next } = openDetail.lesson ? adjacentLessons(lessons, openDetail.lesson) : { prev: null, next: null };
+          const openLesson = (l: Lesson) => setOpenDetail({ lesson: l, homework: homework.find((h) => h.lessonId === l.id), initialTab: "info" });
+          return (
+            <LessonDetailModal
+              key={openDetail.lesson?.id || openDetail.homework?.id}
+              code={code}
+              lesson={openDetail.lesson}
+              homework={openDetail.homework}
+              note={
+                openDetail.homework?.noteId
+                  ? notes.find((n) => n.id === openDetail.homework!.noteId)
+                  : openDetail.lesson?.noteId
+                    ? notes.find((n) => n.id === openDetail.lesson!.noteId)
+                    : undefined
+              }
+              initialTab={openDetail.initialTab}
+              onSubmitHomework={submitHomework}
+              onPrevLesson={prev ? () => openLesson(prev) : undefined}
+              onNextLesson={next ? () => openLesson(next) : undefined}
+              onClose={() => setOpenDetail(null)}
+            />
+          );
+        })()}
 
       {openUpcoming && (
         <Modal title={`Урок · ${fmtDateRu(openUpcoming.date)}`} onClose={() => setOpenUpcoming(null)}>
@@ -553,6 +561,8 @@ function LessonDetailModal({
   note,
   initialTab,
   onSubmitHomework,
+  onPrevLesson,
+  onNextLesson,
   onClose,
 }: {
   code: string;
@@ -561,6 +571,8 @@ function LessonDetailModal({
   note?: MethodNote;
   initialTab: DetailTab;
   onSubmitHomework: (id: string, attachments: Attachment[]) => void;
+  onPrevLesson?: () => void;
+  onNextLesson?: () => void;
   onClose: () => void;
 }) {
   const tabs: DetailTab[] = [
@@ -573,6 +585,27 @@ function LessonDetailModal({
 
   return (
     <Modal title={title} onClose={onClose} full>
+      {lesson && (onPrevLesson || onNextLesson) && (
+        <div className="flex items-center justify-between gap-2 mb-4 -mt-1">
+          <button
+            type="button"
+            onClick={onPrevLesson}
+            disabled={!onPrevLesson}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            <ChevronLeft size={16} /> Предыдущий урок
+          </button>
+          <button
+            type="button"
+            onClick={onNextLesson}
+            disabled={!onNextLesson}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            Следующий урок <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
       {tabs.length > 1 && (
         <div className="flex gap-1 mb-4 border-b border-[#F0F1F4] overflow-x-auto -mt-1">
           {tabs.map((t) => (
