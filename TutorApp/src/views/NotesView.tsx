@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, GripVertical, Layers, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Card, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
-import { AttachmentsField, LargeAttachmentList } from "../components/Attachments";
-import { GRADES, uid } from "../lib/utils";
+import { AttachmentList, AttachmentsField, LargeAttachmentList } from "../components/Attachments";
+import { fmtDateRu, GRADES, lessonLabel, uid } from "../lib/utils";
 import { STARTER_CONTENT } from "../lib/methodologyContent";
-import type { Attachment, Homework, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
+import type { Attachment, Homework, Lesson, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Student, Task } from "../lib/types";
 
 const subjectsForGrade = (grade: string) => {
   if (grade === "5 класс" || grade === "6 класс") return ["Математика"];
@@ -74,12 +74,15 @@ interface Props {
   saveNotes: (n: MethodNote[]) => void;
   tasks: Task[];
   homework: Homework[];
+  lessons: Lesson[];
+  students: Student[];
+  onOpenLesson: (studentId: string, lessonId: string) => void;
   showToast: (t: string) => void;
   activeId: string | null;
   setActiveId: (id: string | null) => void;
 }
 
-export function NotesView({ notes, saveNotes, tasks, homework, showToast, activeId, setActiveId }: Props) {
+export function NotesView({ notes, saveNotes, tasks, homework, lessons, students, onOpenLesson, showToast, activeId, setActiveId }: Props) {
   const [creating, setCreating] = useState(false);
   const [newTopic, setNewTopic] = useState("");
   const active = notes.find((n) => n.id === activeId) || null;
@@ -111,6 +114,9 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
   const topicHomework = active ? homework.filter((h) => h.noteId === active.id) : [];
+  const topicLessons = active
+    ? lessons.filter((l) => l.noteId === active.id).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
+    : [];
 
   const [newGrade, setNewGrade] = useState(NOTE_GRADES[1]);
   const [newSubject, setNewSubject] = useState("Математика");
@@ -455,12 +461,19 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                                 .slice()
                                 .reverse()
                                 .map((h) => (
-                                  <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
-                                    <div className="min-w-0">
-                                      <div className="font-medium text-gray-700 truncate">{h.title}</div>
-                                      <div className="text-gray-400">{h.studentName}</div>
+                                  <div key={h.id} className="text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="font-medium text-gray-700 truncate">{h.title}</div>
+                                        <div className="text-gray-400">{h.studentName}</div>
+                                      </div>
+                                      <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
                                     </div>
-                                    <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
+                                    {h.attachments && h.attachments.length > 0 && (
+                                      <div className="mt-1.5">
+                                        <AttachmentList attachments={h.attachments} />
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                             </div>
@@ -481,6 +494,26 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                         label={isTheoryRules ? "Файлы к теории и правилам" : `Файлы к разделу «${group.label}»`}
                       />
                     </div>
+
+                    {group.id === "homework" && topicLessons.length > 0 && (
+                      <div className="mt-5 pt-5 border-t border-[#F0F1F4]">
+                        <div className="text-xs font-semibold text-gray-500 mb-2">Уроки, проведённые по этой теме ({topicLessons.length})</div>
+                        <div className="space-y-1.5">
+                          {topicLessons.map((l) => (
+                            <button
+                              key={l.id}
+                              type="button"
+                              onClick={() => l.studentId && onOpenLesson(l.studentId, l.id)}
+                              disabled={!l.studentId}
+                              className="w-full flex items-center justify-between gap-2 text-xs bg-[#F7F8FA] hover:bg-gray-100 rounded-lg px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <span className="font-medium text-gray-700 truncate">{lessonLabel(l, students)}</span>
+                              <span className="text-gray-400 shrink-0">{fmtDateRu(l.date)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })()}

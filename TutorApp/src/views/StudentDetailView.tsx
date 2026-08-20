@@ -65,6 +65,10 @@ interface Props {
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
+  /** Set when navigating in from elsewhere (e.g. a topic's homework tab in
+   * Методика) to jump straight to a specific lesson's edit modal. */
+  initialLessonId?: string | null;
+  onConsumeInitialLesson?: () => void;
 }
 
 export function StudentDetailPage({
@@ -80,10 +84,23 @@ export function StudentDetailPage({
   selectedStudentId,
   setView,
   showToast,
+  initialLessonId,
+  onConsumeInitialLesson,
 }: Props) {
   const student = students.find((s) => s.id === selectedStudentId);
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
+
+  useEffect(() => {
+    if (!initialLessonId) return;
+    const lesson = lessons.find((l) => l.id === initialLessonId);
+    if (lesson) {
+      setEditLesson(lesson);
+      setShowLessonForm(true);
+    }
+    onConsumeInitialLesson?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLessonId]);
   const [invite, setInvite] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
