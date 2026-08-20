@@ -517,6 +517,35 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
     showToast("Вкладки заполнены типовым текстом");
   };
 
+  const handleFillAllStarter = () => {
+    const filteredIds = new Set(filteredNotes.map((n) => n.id));
+    let filledCount = 0;
+    const next = notes.map((n) => {
+      if (!filteredIds.has(n.id)) return n;
+      const starter = STARTER_CONTENT[`${n.grade}|${displaySubject(n.subject)}|${n.topic}`];
+      if (!starter) return n;
+      const nextTabs: MethodNoteTabs = { ...getTabs(n) };
+      let changed = false;
+      (Object.keys(starter) as MethodNoteTabKey[]).forEach((k) => {
+        const value = starter[k];
+        if (value && !nextTabs[k]?.trim()) {
+          nextTabs[k] = value;
+          changed = true;
+        }
+      });
+      if (!changed) return n;
+      filledCount++;
+      return { ...n, tabs: nextTabs, updatedAt: Date.now() };
+    });
+    if (filledCount === 0) {
+      showToast("Нечего заполнять: в текущем списке нет тем с типовым текстом");
+      return;
+    }
+    saveNotes(next);
+    if (active) setDraftTabs(getTabs(next.find((n) => n.id === active.id) || null));
+    showToast(`Заполнено тем: ${filledCount}`);
+  };
+
   const handleAttachmentsChange = (tabKey: MethodNoteTabKey, next: Attachment[]) => {
     if (!active) return;
     const nextAttachments: MethodNoteAttachments = { ...(active.attachments || {}), [tabKey]: next };
@@ -576,6 +605,9 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
           <div className="w-44">
             <Select value={subjectFilter} onChange={setSubjectFilter} options={["Все предметы", ...ALL_SUBJECTS]} />
           </div>
+          <GhostButton icon={Sparkles} onClick={handleFillAllStarter} disabled={filteredNotes.length === 0}>
+            Заполнить всё типовым текстом
+          </GhostButton>
         </div>
       </Card>
 
