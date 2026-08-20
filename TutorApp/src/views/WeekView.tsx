@@ -82,7 +82,6 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
   const nowLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   function lessonAppearance(l: Lesson) {
-    if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
     const isPast = isLessonPast(l);
     const color = students.find((s) => s.id === l.studentId)?.color;
     const style = lessonPillStyle(color, isPast);
@@ -187,9 +186,11 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
           </div>
           {days.map((d, i) => {
             const key = dateKey(d);
-            const dayLessons = lessons.filter((l) => l.date === key);
+            const dayLessons = lessons.filter((l) => l.date === key && l.status !== "cancelled");
+            const cancelledDayLessons = lessons.filter((l) => l.date === key && l.status === "cancelled");
             const dayGcalTimed = gcalEvents.filter((e) => e.date === key && !e.allDay && e.time);
             const todayCol = isToday(d);
+            const cancelledLaneWidth = cancelledDayLessons.length > 0 ? 14 : 0;
 
             type Item =
               | { kind: "lesson"; lesson: Lesson; start: number; end: number }
@@ -217,55 +218,76 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                   <div key={h} className="absolute left-0 right-0 border-t border-[#F0F1F4]" style={{ top: topPx(h * 60) }} />
                 ))}
 
-                {positioned.map((p) => {
-                  const widthPct = 100 / p.cols;
-                  const leftPct = p.col * widthPct;
-                  const heightPx = Math.max(topPx(p.end) - topPx(p.start), 20);
-                  const style = {
-                    top: topPx(p.start),
-                    height: heightPx,
-                    left: `calc(${leftPct}% + 1px)`,
-                    width: `calc(${widthPct}% - 2px)`,
-                  };
+                <div className="absolute inset-0" style={{ right: cancelledLaneWidth }}>
+                  {positioned.map((p) => {
+                    const widthPct = 100 / p.cols;
+                    const leftPct = p.col * widthPct;
+                    const heightPx = Math.max(topPx(p.end) - topPx(p.start), 20);
+                    const style = {
+                      top: topPx(p.start),
+                      height: heightPx,
+                      left: `calc(${leftPct}% + 1px)`,
+                      width: `calc(${widthPct}% - 2px)`,
+                    };
 
-                  if (p.kind === "gcal") {
+                    if (p.kind === "gcal") {
+                      return (
+                        <a
+                          key={`g-${p.event.id}`}
+                          href={p.event.htmlLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={style}
+                          className="absolute flex items-start gap-0.5 text-left text-[10px] px-1.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition overflow-hidden"
+                        >
+                          <div className="min-w-0 flex-1 truncate">{p.event.title}</div>
+                          <ExternalLink size={10} className="shrink-0 mt-0.5" />
+                        </a>
+                      );
+                    }
+
+                    const l = p.lesson;
+                    const appearance = lessonAppearance(l);
+                    const hasCustomColor = !!appearance.style;
                     return (
-                      <a
-                        key={`g-${p.event.id}`}
-                        href={p.event.htmlLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={style}
-                        className="absolute flex items-start gap-0.5 text-left text-[10px] px-1.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition overflow-hidden"
+                      <button
+                        key={l.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onLessonClick(l);
+                        }}
+                        style={{ ...style, ...appearance.style }}
+                        className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className}`}
                       >
-                        <div className="min-w-0 flex-1 truncate">{p.event.title}</div>
-                        <ExternalLink size={10} className="shrink-0 mt-0.5" />
-                      </a>
+                        <div className="flex items-center gap-1">
+                          {hasCustomColor && (
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
+                          )}
+                          <span className="tabular-nums">{heightPx > 40 ? `${l.time}–${addMinutes(l.time, l.duration)}` : l.time}</span>
+                        </div>
+                        {heightPx > 34 && <div className="truncate">{lessonLabel(l, students)}</div>}
+                      </button>
                     );
-                  }
+                  })}
+                </div>
 
-                  const l = p.lesson;
-                  const appearance = lessonAppearance(l);
-                  const hasCustomColor = !!appearance.style;
+                {/* Cancelled lessons are pushed into a slim strip on the edge instead of
+                    occupying the main lane, so the freed time slot reads as bookable. */}
+                {cancelledDayLessons.map((l) => {
+                  const start = timeToMinutes(l.time);
+                  const heightPx = Math.max(topPx(start + l.duration) - topPx(start), 14);
                   return (
                     <button
                       key={l.id}
+                      title={`${l.time} · ${lessonLabel(l, students)} — отменено`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onLessonClick(l);
                       }}
-                      style={{ ...style, ...appearance.style }}
-                      className={`absolute text-left text-[10px] leading-tight px-1.5 py-1 rounded-md font-medium transition overflow-hidden ${appearance.className}`}
-                    >
-                      <div className="flex items-center gap-1">
-                        {hasCustomColor && l.status !== "cancelled" && (
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
-                        )}
-                        <span className="tabular-nums">{heightPx > 40 ? `${l.time}–${addMinutes(l.time, l.duration)}` : l.time}</span>
-                      </div>
-                      {heightPx > 34 && <div className="truncate">{lessonLabel(l, students)}</div>}
-                    </button>
+                      style={{ top: topPx(start), height: heightPx, width: cancelledLaneWidth - 3 }}
+                      className="absolute right-0 rounded-sm bg-gray-200 hover:bg-gray-300 transition"
+                    />
                   );
                 })}
 

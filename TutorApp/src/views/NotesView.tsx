@@ -3,7 +3,7 @@ import { Check, GripVertical, Layers, Plus, Search, Trash2, X } from "lucide-rea
 import { Card, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
-import type { Attachment, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
+import type { Attachment, Homework, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
 
 const subjectsForGrade = (grade: string) => {
   if (grade === "5 класс" || grade === "6 класс") return ["Математика"];
@@ -54,16 +54,23 @@ const emptyNote = (): MethodNote => ({
   updatedAt: Date.now(),
 });
 
+const HW_STATUS_LABELS: Record<Homework["status"], string> = {
+  assigned: "Не сдано",
+  submitted: "На проверке",
+  done: "Проверено",
+};
+
 interface Props {
   notes: MethodNote[];
   saveNotes: (n: MethodNote[]) => void;
   tasks: Task[];
+  homework: Homework[];
   showToast: (t: string) => void;
   activeId: string | null;
   setActiveId: (id: string | null) => void;
 }
 
-export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setActiveId }: Props) {
+export function NotesView({ notes, saveNotes, tasks, homework, showToast, activeId, setActiveId }: Props) {
   const [creating, setCreating] = useState(false);
   const [newTopic, setNewTopic] = useState("");
   const active = notes.find((n) => n.id === activeId) || null;
@@ -94,6 +101,7 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
+  const topicHomework = active ? homework.filter((h) => h.noteId === active.id) : [];
 
   const [newGrade, setNewGrade] = useState(NOTE_GRADES[1]);
   const [newSubject, setNewSubject] = useState("Математика");
@@ -343,6 +351,26 @@ export function NotesView({ notes, saveNotes, tasks, showToast, activeId, setAct
                 onChange={(e) => setDraftTabs((t) => ({ ...t, [activeTab]: e.target.value }))}
                 onBlur={handleSaveDraft}
               />
+
+              {activeTab === "homework" && topicHomework.length > 0 && (
+                <div className="mt-4 border-t border-[#F0F1F4] pt-3">
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {topicHomework
+                      .slice()
+                      .reverse()
+                      .map((h) => (
+                        <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-700 truncate">{h.title}</div>
+                            <div className="text-gray-400">{h.studentName}</div>
+                          </div>
+                          <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4">
                 <AttachmentsField
