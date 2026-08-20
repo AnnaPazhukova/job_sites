@@ -183,10 +183,22 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
             <TextInput placeholder="Поиск по теме..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
           </div>
           <div className="w-40">
-            <Select value={gradeFilter} onChange={setGradeFilter} options={["Все классы", ...NOTE_GRADES]} />
+            <Select
+              value={gradeFilter}
+              onChange={(v) => {
+                setGradeFilter(v);
+                const opts = v === "Все классы" ? ALL_SUBJECTS : subjectsForGrade(v);
+                if (subjectFilter !== "Все предметы" && !opts.includes(subjectFilter)) setSubjectFilter("Все предметы");
+              }}
+              options={["Все классы", ...NOTE_GRADES]}
+            />
           </div>
           <div className="w-44">
-            <Select value={subjectFilter} onChange={setSubjectFilter} options={["Все предметы", ...ALL_SUBJECTS]} />
+            <Select
+              value={subjectFilter}
+              onChange={setSubjectFilter}
+              options={["Все предметы", ...(gradeFilter === "Все классы" ? ALL_SUBJECTS : subjectsForGrade(gradeFilter))]}
+            />
           </div>
         </div>
       </Card>
