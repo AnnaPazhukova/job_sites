@@ -29,3 +29,29 @@ button:disabled {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Some OS/browser combinations render a native scrollbar with visible
+   up/down step-arrow buttons, which looks out of place floating over app
+   content. Replace it everywhere with a slim, buttonless scrollbar. */
+* {
+  scrollbar-width: thin;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
