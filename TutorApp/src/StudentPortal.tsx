@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
@@ -254,6 +254,17 @@ export default function StudentPortal({ code, onExit }: Props) {
   const [loadError, setLoadError] = useState<"invalid" | "setup" | null>(null);
   const [openDetail, setOpenDetail] = useState<DetailTarget | null>(null);
   const [openUpcoming, setOpenUpcoming] = useState<Lesson | null>(null);
+  const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showNotif) return;
+    function onDocClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotif(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [showNotif]);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -358,14 +369,40 @@ export default function StudentPortal({ code, onExit }: Props) {
             <span className="text-[#111827]">Space</span>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setTab("homework")}
-              className="relative p-2.5 rounded-full hover:bg-gray-100 text-gray-500 transition"
-              aria-label="Уведомления"
-            >
-              <Bell size={20} strokeWidth={1.8} />
-              {urgentHomework.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />}
-            </button>
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotif((s) => !s)}
+                className="relative p-2.5 rounded-full hover:bg-gray-100 text-gray-500 transition"
+                aria-label="Уведомления"
+              >
+                <Bell size={20} strokeWidth={1.8} />
+                {urgentHomework.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />}
+              </button>
+              {showNotif && (
+                <div className="absolute right-0 top-full mt-2 w-72 max-w-[85vw] bg-white rounded-xl border border-[#E7E9EE] shadow-lg z-40 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[#F0F1F4] text-sm font-semibold">Уведомления</div>
+                  {urgentHomework.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-gray-400">Новых уведомлений нет</div>
+                  ) : (
+                    <div className="divide-y divide-[#F0F1F4] max-h-80 overflow-y-auto">
+                      {urgentHomework.map((h) => (
+                        <button
+                          key={h.id}
+                          onClick={() => {
+                            setShowNotif(false);
+                            setOpenDetail({ lesson: h.lessonId ? lessons.find((l) => l.id === h.lessonId) : undefined, homework: h, initialTab: "homework" });
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-gray-50 transition"
+                        >
+                          <div className="text-sm font-medium text-gray-800">{h.title}</div>
+                          <div className="text-xs text-amber-600 mt-0.5">Не сдано, срок — {fmtDateRu(h.due)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {profile && (
               <div className="hidden sm:flex items-center gap-2">
                 <Avatar id={profile.id} name={profile.name} size={30} color={profile.color} />
