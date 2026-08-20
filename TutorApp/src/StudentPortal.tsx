@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
+import { Bell, BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRight, Layers, LogOut, MessageCircle, Paperclip, Send } from "lucide-react";
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { dateKey, durationLabel, fmtDateRu, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -50,9 +50,16 @@ function sortedHomework(homework: Homework[]): Homework[] {
   return [...homework].reverse().sort((a, b) => HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)]);
 }
 
-// A student is unlikely to ever revisit homework the tutor has already
-// reviewed — split it off into a collapsed section so the list opens on
-// what still needs attention.
+const OTHER_FILTERS: { id: "all" | "submitted" | "done"; label: string }[] = [
+  { id: "all", label: "Все" },
+  { id: "submitted", label: "На проверке" },
+  { id: "done", label: "Проверено" },
+];
+
+// Not-yet-submitted homework needs attention first, so it always gets its
+// own always-visible section. Submitted/reviewed items are grouped together
+// under a filter, since the student is unlikely to need "проверено" and "на
+// проверке" separated most of the time.
 function HomeworkTabContent({
   homework,
   lessons,
@@ -64,42 +71,57 @@ function HomeworkTabContent({
   notes: MethodNote[];
   onOpen: (lesson: Lesson | null, h: Homework) => void;
 }) {
-  const [showDone, setShowDone] = useState(false);
+  const [otherFilter, setOtherFilter] = useState<"all" | "submitted" | "done">("all");
 
   if (homework.length === 0) {
     return <EmptyState icon={BookOpen} title="Домашних заданий пока нет" />;
   }
 
-  const active = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) !== "done"));
-  const done = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) === "done"));
+  const notSubmitted = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) === "assigned"));
+  const others = sortedHomework(homework.filter((h) => normalizeHomeworkStatus(h.status) !== "assigned"));
+  const filteredOthers = otherFilter === "all" ? others : others.filter((h) => normalizeHomeworkStatus(h.status) === otherFilter);
 
   return (
-    <div className="space-y-5">
-      {active.length > 0 ? (
-        <Card className="divide-y divide-[#F0F1F4]">
-          {active.map((h) => (
-            <HomeworkRow key={h.id} h={h} lessons={lessons} notes={notes} onOpen={onOpen} />
-          ))}
-        </Card>
-      ) : (
-        <div className="py-10 text-center text-gray-400 text-sm">Невыполненных заданий нет 🎉</div>
-      )}
+    <div className="space-y-6">
+      <div>
+        <div className="text-sm font-semibold text-gray-800 mb-2">Не сдано{notSubmitted.length > 0 ? ` (${notSubmitted.length})` : ""}</div>
+        {notSubmitted.length > 0 ? (
+          <Card className="divide-y divide-[#F0F1F4]">
+            {notSubmitted.map((h) => (
+              <HomeworkRow key={h.id} h={h} lessons={lessons} notes={notes} onOpen={onOpen} />
+            ))}
+          </Card>
+        ) : (
+          <div className="py-8 text-center text-gray-400 text-sm">Невыполненных заданий нет 🎉</div>
+        )}
+      </div>
 
-      {done.length > 0 && (
+      {others.length > 0 && (
         <div>
-          <button
-            onClick={() => setShowDone((s) => !s)}
-            className="w-full flex items-center justify-between px-1 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition"
-          >
-            <span>Выполненные ({done.length})</span>
-            <ChevronDown size={16} className={`transition-transform ${showDone ? "rotate-180" : ""}`} />
-          </button>
-          {showDone && (
-            <Card className="divide-y divide-[#F0F1F4] mt-2">
-              {done.map((h) => (
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <div className="text-sm font-semibold text-gray-800">Все остальные ({others.length})</div>
+            <div className="inline-flex rounded-lg border border-gray-300 bg-white p-0.5 text-xs">
+              {OTHER_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setOtherFilter(f.id)}
+                  className={`px-2.5 py-1 rounded-md font-medium transition ${
+                    otherFilter === f.id ? "bg-[#2563EB] text-white" : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {filteredOthers.length > 0 ? (
+            <Card className="divide-y divide-[#F0F1F4]">
+              {filteredOthers.map((h) => (
                 <HomeworkRow key={h.id} h={h} lessons={lessons} notes={notes} onOpen={onOpen} />
               ))}
             </Card>
+          ) : (
+            <div className="py-8 text-center text-gray-400 text-sm">Ничего нет</div>
           )}
         </div>
       )}
@@ -168,6 +190,49 @@ function HomeworkRow({
         </div>
       )}
     </div>
+  );
+}
+
+// Balance is the same advance-minus-debt logic as the tutor-side
+// studentBalance() in StudentsView.tsx, recomputed here rather than
+// imported since `lessons` fetched via the portal are already scoped to
+// this one student (no studentId filter needed).
+function PaymentSummary({ profile, lessons }: { profile: Student; lessons: Lesson[] }) {
+  const own = lessons.filter((l) => l.status !== "cancelled");
+  const advance = own.filter((l) => l.paymentStatus === "paid" && !isLessonPast(l)).reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const debt = own.filter((l) => l.paymentStatus !== "paid" && isLessonPast(l)).reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const balance = advance - debt;
+  const sub = profile.subscription;
+
+  return (
+    <Card className="p-4 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Баланс:</span>
+        {balance === 0 ? (
+          <span className="text-sm font-semibold text-gray-500">Задолженности нет</span>
+        ) : (
+          <span className={`text-sm font-semibold px-2.5 py-1 rounded-lg ${balance < 0 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
+            {balance < 0 ? `Долг ${fmtMoney(-balance)}` : `Аванс ${fmtMoney(balance)}`}
+          </span>
+        )}
+      </div>
+      {sub ? (
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <span className="text-xs font-medium text-gray-500 shrink-0">Абонемент от {fmtDateRu(sub.startDate)}:</span>
+          <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden max-w-[160px]">
+            <div
+              className="h-full bg-[#2563EB]"
+              style={{ width: `${Math.min(100, (100 * (sub.total - sub.remaining)) / (sub.total || 1))}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-500 shrink-0">
+            {sub.total - sub.remaining} из {sub.total}
+          </span>
+        </div>
+      ) : (
+        <div className="text-xs text-gray-400">Абонемент не оформлен</div>
+      )}
+    </Card>
   );
 }
 
@@ -293,6 +358,14 @@ export default function StudentPortal({ code, onExit }: Props) {
             <span className="text-[#111827]">Space</span>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setTab("homework")}
+              className="relative p-2.5 rounded-full hover:bg-gray-100 text-gray-500 transition"
+              aria-label="Уведомления"
+            >
+              <Bell size={20} strokeWidth={1.8} />
+              {urgentHomework.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />}
+            </button>
             {profile && (
               <div className="hidden sm:flex items-center gap-2">
                 <Avatar id={profile.id} name={profile.name} size={30} color={profile.color} />
@@ -306,7 +379,7 @@ export default function StudentPortal({ code, onExit }: Props) {
         </div>
       </header>
 
-      <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-6">
+      <main className={`${tab === "schedule" ? "max-w-[1200px]" : "max-w-[900px]"} mx-auto px-4 sm:px-6 py-6`}>
         {loadError === "setup" ? (
           <div className="py-24 text-center text-gray-500">
             <div className="font-semibold text-lg mb-1">Кабинет временно недоступен</div>
@@ -323,19 +396,7 @@ export default function StudentPortal({ code, onExit }: Props) {
           <>
             <PageHeader title={profile ? `Здравствуйте, ${profile.firstName || profile.name}!` : "Личный кабинет"} />
 
-            {urgentHomework.length > 0 && (
-              <button
-                onClick={() => setTab("homework")}
-                className="w-full flex items-start gap-2 text-left text-sm bg-amber-50 text-amber-700 px-4 py-3 rounded-xl mb-5 hover:bg-amber-100 transition"
-              >
-                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                <span>
-                  {urgentHomework.length === 1
-                    ? `Не сдано домашнее задание «${urgentHomework[0].title}», срок — ${fmtDateRu(urgentHomework[0].due)}.`
-                    : `Не сдано домашних заданий: ${urgentHomework.length}, ближайший срок — ${fmtDateRu(urgentHomework[0].due)}.`}
-                </span>
-              </button>
-            )}
+            {profile && <PaymentSummary profile={profile} lessons={lessons} />}
 
             <div className="flex mb-5 border-b border-[#E7E9EE]">
               {TABS.map((t) => {
