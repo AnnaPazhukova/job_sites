@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, Layers, Plus, Search, Trash2, X } from "lucide-react";
-import { Card, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
+import { Check, GripVertical, Layers, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Card, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentsField } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
+import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, Homework, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
 
 const subjectsForGrade = (grade: string) => {
@@ -122,6 +123,49 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
     showToast("Заметка сохранена");
   };
 
+  const starterForActive = active ? STARTER_CONTENT[`${active.grade}|${displaySubject(active.subject)}|${active.topic}`] : undefined;
+
+  const handleFillStarter = () => {
+    if (!active || !starterForActive) return;
+    const next: MethodNoteTabs = { ...draftTabs };
+    (Object.keys(starterForActive) as MethodNoteTabKey[]).forEach((k) => {
+      const value = starterForActive[k];
+      if (value && !next[k]?.trim()) next[k] = value;
+    });
+    setDraftTabs(next);
+    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, tabs: next, updatedAt: Date.now() } : n)));
+    showToast("Вкладки заполнены типовым текстом");
+  };
+
+  const handleFillAllStarter = () => {
+    const filteredIds = new Set(filteredNotes.map((n) => n.id));
+    let filledCount = 0;
+    const next = notes.map((n) => {
+      if (!filteredIds.has(n.id)) return n;
+      const starter = STARTER_CONTENT[`${n.grade}|${displaySubject(n.subject)}|${n.topic}`];
+      if (!starter) return n;
+      const nextTabs: MethodNoteTabs = { ...getTabs(n) };
+      let changed = false;
+      (Object.keys(starter) as MethodNoteTabKey[]).forEach((k) => {
+        const value = starter[k];
+        if (value && !nextTabs[k]?.trim()) {
+          nextTabs[k] = value;
+          changed = true;
+        }
+      });
+      if (!changed) return n;
+      filledCount++;
+      return { ...n, tabs: nextTabs, updatedAt: Date.now() };
+    });
+    if (filledCount === 0) {
+      showToast("Нечего заполнять: в текущем списке нет тем с типовым текстом");
+      return;
+    }
+    saveNotes(next);
+    if (active) setDraftTabs(getTabs(next.find((n) => n.id === active.id) || null));
+    showToast(`Заполнено тем: ${filledCount}`);
+  };
+
   const startEditTopic = () => {
     if (!active) return;
     setTopicDraft(active.topic);
@@ -200,6 +244,9 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
               options={["Все предметы", ...(gradeFilter === "Все классы" ? ALL_SUBJECTS : subjectsForGrade(gradeFilter))]}
             />
           </div>
+          <GhostButton icon={Sparkles} onClick={handleFillAllStarter} disabled={filteredNotes.length === 0}>
+            Заполнить всё типовым текстом
+          </GhostButton>
         </div>
       </Card>
 
@@ -329,6 +376,15 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                 </div>
                 <div className="flex items-center gap-2">
                   {relatedCount > 0 && <Pill tone="type">{relatedCount} задач в базе</Pill>}
+                  {starterForActive && (
+                    <button
+                      onClick={handleFillStarter}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition"
+                      title="Подставить типовой текст учебника в пустые вкладки"
+                    >
+                      <Sparkles size={13} /> Заполнить типовым текстом
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       if (window.confirm(`Удалить тему «${active.topic}»?`)) handleDelete(active.id);
