@@ -379,7 +379,7 @@ export default function StudentPortal({ code, onExit }: Props) {
         </div>
       </header>
 
-      <main className={`${tab === "schedule" ? "max-w-[1200px]" : "max-w-[900px]"} mx-auto px-4 sm:px-6 py-6`}>
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6">
         {loadError === "setup" ? (
           <div className="py-24 text-center text-gray-500">
             <div className="font-semibold text-lg mb-1">Кабинет временно недоступен</div>
@@ -447,6 +447,7 @@ export default function StudentPortal({ code, onExit }: Props) {
                           cursor={weekCursor}
                           lessons={lessons}
                           students={profile ? [profile] : []}
+                          classicCancelled
                           onDayClick={() => {}}
                           onLessonClick={(l) => {
                             if (l.status === "cancelled") {
