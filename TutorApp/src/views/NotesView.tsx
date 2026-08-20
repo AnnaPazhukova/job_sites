@@ -22,11 +22,10 @@ function displaySubject(subject: string): string {
 }
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
-// Theory and Rules are shown as always-visible sections (with their own
-// attachments inline) rather than switchable tabs — a tutor reads both while
-// actually teaching the lesson, so hiding one behind a click is friction.
-// Tasks/Test/Homework stay tabbed since only one is relevant at a time.
-const TAB_ORDER: MethodNoteTabKey[] = ["tasks", "test", "homework"];
+// All five sections render stacked on one page (with their own attachments
+// inline) rather than behind switchable tabs — a tutor wants theory, rules,
+// tasks, test and homework all visible together while teaching the lesson.
+const TAB_ORDER: MethodNoteTabKey[] = ["theory", "rules", "tasks", "test", "homework"];
 const TAB_LABELS: Record<MethodNoteTabKey, string> = {
   theory: "Теория",
   rules: "Правила",
@@ -80,14 +79,12 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
   const [newTopic, setNewTopic] = useState("");
   const active = notes.find((n) => n.id === activeId) || null;
 
-  const [activeTab, setActiveTab] = useState<MethodNoteTabKey>("tasks");
   const [draftTabs, setDraftTabs] = useState<MethodNoteTabs>(getTabs(active));
   const [editingTopic, setEditingTopic] = useState(false);
   const [topicDraft, setTopicDraft] = useState("");
 
   useEffect(() => {
     setDraftTabs(getTabs(active));
-    setActiveTab("tasks");
     setEditingTopic(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -401,10 +398,10 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                 </div>
               </div>
 
-              {(["theory", "rules"] as const).map((tab) => {
+              {TAB_ORDER.map((tab, i) => {
                 const files = active.attachments?.[tab] || [];
                 return (
-                  <div key={tab} className="mb-5">
+                  <div key={tab} className={`mb-5 ${i > 0 ? "pt-5 border-t border-[#F0F1F4]" : ""}`}>
                     <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>
                     <TextArea
                       className="min-h-[160px] text-sm"
@@ -413,6 +410,25 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                       onChange={(e) => setDraftTabs((t) => ({ ...t, [tab]: e.target.value }))}
                       onBlur={handleSaveDraft}
                     />
+                    {tab === "homework" && topicHomework.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                          {topicHomework
+                            .slice()
+                            .reverse()
+                            .map((h) => (
+                              <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-gray-700 truncate">{h.title}</div>
+                                  <div className="text-gray-400">{h.studentName}</div>
+                                </div>
+                                <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                     {files.length > 0 && (
                       <div className="mt-3">
                         <LargeAttachmentList attachments={files} />
@@ -428,56 +444,6 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                   </div>
                 );
               })}
-
-              <div className="flex gap-1 mb-4 border-t border-b border-[#F0F1F4] pt-4 overflow-x-auto">
-                {TAB_ORDER.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-3.5 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
-                      activeTab === tab ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {TAB_LABELS[tab]}
-                  </button>
-                ))}
-              </div>
-
-              <TextArea
-                key={activeTab}
-                className="min-h-[300px] text-sm"
-                placeholder={TAB_PLACEHOLDERS[activeTab]}
-                value={draftTabs[activeTab]}
-                onChange={(e) => setDraftTabs((t) => ({ ...t, [activeTab]: e.target.value }))}
-                onBlur={handleSaveDraft}
-              />
-
-              {activeTab === "homework" && topicHomework.length > 0 && (
-                <div className="mt-4 border-t border-[#F0F1F4] pt-3">
-                  <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {topicHomework
-                      .slice()
-                      .reverse()
-                      .map((h) => (
-                        <div key={h.id} className="flex items-start justify-between gap-2 text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
-                          <div className="min-w-0">
-                            <div className="font-medium text-gray-700 truncate">{h.title}</div>
-                            <div className="text-gray-400">{h.studentName}</div>
-                          </div>
-                          <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <AttachmentsField
-                  attachments={active.attachments?.[activeTab] || []}
-                  onChange={(next) => handleAttachmentsChange(activeTab, next)}
-                />
-              </div>
 
               <div className="flex justify-end mt-4">
                 <PrimaryButton icon={Check} onClick={handleSaveDraft}>
