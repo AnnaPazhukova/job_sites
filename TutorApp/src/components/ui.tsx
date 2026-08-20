@@ -204,7 +204,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`bg-white w-full ${sizeClass} rounded-t-2xl sm:rounded-2xl max-h-[95vh] overflow-y-auto`}
+        className={`bg-white w-full ${sizeClass} rounded-t-2xl sm:rounded-2xl max-h-[95vh] overflow-y-auto no-scrollbar`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E9EE] sticky top-0 bg-white z-10">

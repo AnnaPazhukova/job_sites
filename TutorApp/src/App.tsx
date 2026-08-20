@@ -72,11 +72,19 @@ export default function App({ userEmail, onSignOut }: AppProps) {
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [initialLessonId, setInitialLessonId] = useState<string | null>(null);
 
   const openNote = useCallback((id: string) => {
     setActiveNoteId(id);
     setToast(null);
     setView("notes");
+  }, []);
+
+  const openLesson = useCallback((studentId: string, lessonId: string) => {
+    setSelectedStudentId(studentId);
+    setInitialLessonId(lessonId);
+    setToast(null);
+    setView("student-detail");
   }, []);
 
   // Seed the task bank & methodology library once, on first run.
@@ -209,6 +217,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   selectedStudentId={selectedStudentId}
                   setView={setView}
                   showToast={showToast}
+                  initialLessonId={initialLessonId}
+                  onConsumeInitialLesson={() => setInitialLessonId(null)}
                 />
               )}
               {view === "schedule" && (
@@ -245,6 +255,9 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   saveNotes={saveNotes}
                   tasks={tasks}
                   homework={homework}
+                  lessons={lessons}
+                  students={students}
+                  onOpenLesson={openLesson}
                   showToast={showToast}
                   activeId={activeNoteId}
                   setActiveId={setActiveNoteId}
