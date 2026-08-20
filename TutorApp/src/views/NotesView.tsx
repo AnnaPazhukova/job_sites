@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, GripVertical, Layers, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Card, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
-import { AttachmentsField } from "../components/Attachments";
+import { AttachmentsField, LargeAttachmentList } from "../components/Attachments";
 import { GRADES, uid } from "../lib/utils";
 import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, Homework, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Task } from "../lib/types";
@@ -22,7 +22,11 @@ function displaySubject(subject: string): string {
 }
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
-const TAB_ORDER: MethodNoteTabKey[] = ["theory", "rules", "tasks", "test", "homework"];
+// Theory and Rules are shown as always-visible sections (with their own
+// attachments inline) rather than switchable tabs — a tutor reads both while
+// actually teaching the lesson, so hiding one behind a click is friction.
+// Tasks/Test/Homework stay tabbed since only one is relevant at a time.
+const TAB_ORDER: MethodNoteTabKey[] = ["tasks", "test", "homework"];
 const TAB_LABELS: Record<MethodNoteTabKey, string> = {
   theory: "Теория",
   rules: "Правила",
@@ -76,14 +80,14 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
   const [newTopic, setNewTopic] = useState("");
   const active = notes.find((n) => n.id === activeId) || null;
 
-  const [activeTab, setActiveTab] = useState<MethodNoteTabKey>("theory");
+  const [activeTab, setActiveTab] = useState<MethodNoteTabKey>("tasks");
   const [draftTabs, setDraftTabs] = useState<MethodNoteTabs>(getTabs(active));
   const [editingTopic, setEditingTopic] = useState(false);
   const [topicDraft, setTopicDraft] = useState("");
 
   useEffect(() => {
     setDraftTabs(getTabs(active));
-    setActiveTab("theory");
+    setActiveTab("tasks");
     setEditingTopic(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -397,7 +401,35 @@ export function NotesView({ notes, saveNotes, tasks, homework, showToast, active
                 </div>
               </div>
 
-              <div className="flex gap-1 mb-4 border-b border-[#F0F1F4] overflow-x-auto">
+              {(["theory", "rules"] as const).map((tab) => {
+                const files = active.attachments?.[tab] || [];
+                return (
+                  <div key={tab} className="mb-5">
+                    <div className="text-sm font-semibold text-gray-700 mb-1.5">{TAB_LABELS[tab]}</div>
+                    <TextArea
+                      className="min-h-[160px] text-sm"
+                      placeholder={TAB_PLACEHOLDERS[tab]}
+                      value={draftTabs[tab]}
+                      onChange={(e) => setDraftTabs((t) => ({ ...t, [tab]: e.target.value }))}
+                      onBlur={handleSaveDraft}
+                    />
+                    {files.length > 0 && (
+                      <div className="mt-3">
+                        <LargeAttachmentList attachments={files} />
+                      </div>
+                    )}
+                    <div className="mt-3">
+                      <AttachmentsField
+                        attachments={files}
+                        onChange={(next) => handleAttachmentsChange(tab, next)}
+                        label={`Файлы к разделу «${TAB_LABELS[tab]}»`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex gap-1 mb-4 border-t border-b border-[#F0F1F4] pt-4 overflow-x-auto">
                 {TAB_ORDER.map((tab) => (
                   <button
                     key={tab}

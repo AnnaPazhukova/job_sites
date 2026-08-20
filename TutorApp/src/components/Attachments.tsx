@@ -284,6 +284,7 @@ export function LargeAttachmentList({ attachments }: { attachments: Attachment[]
 export function AttachmentsField({ attachments, onChange, label = "Файлы", folder }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -320,8 +321,22 @@ export function AttachmentsField({ attachments, onChange, label = "Файлы", 
         </div>
       )}
       {fileStorageEnabled ? (
-        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500 hover:border-[#2563EB] hover:text-[#2563EB] cursor-pointer transition">
-          <Upload size={14} /> {uploading ? "Загрузка..." : "Прикрепить файл"}
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            void handleFiles(e.dataTransfer.files);
+          }}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed text-sm cursor-pointer transition ${
+            dragging ? "border-[#2563EB] bg-[#EEF2FF] text-[#2563EB]" : "border-gray-300 text-gray-500 hover:border-[#2563EB] hover:text-[#2563EB]"
+          }`}
+        >
+          <Upload size={14} /> {uploading ? "Загрузка..." : dragging ? "Отпустите файл здесь" : "Прикрепить файл (или перетащите сюда)"}
           <input
             type="file"
             multiple
