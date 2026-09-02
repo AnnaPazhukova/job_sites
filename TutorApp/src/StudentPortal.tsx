@@ -3,7 +3,7 @@ import { Bell, BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRigh
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { adjacentLessons, dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, TODAY } from "./lib/utils";
+import { adjacentLessons, dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, paidAmountOf, remainingAmountOf, TODAY } from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -199,8 +199,8 @@ function HomeworkRow({
 // this one student (no studentId filter needed).
 function PaymentSummary({ profile, lessons }: { profile: Student; lessons: Lesson[] }) {
   const own = lessons.filter((l) => l.status !== "cancelled");
-  const advance = own.filter((l) => l.paymentStatus === "paid" && !isLessonPast(l)).reduce((s, l) => s + (Number(l.price) || 0), 0);
-  const debt = own.filter((l) => l.paymentStatus !== "paid" && isLessonPast(l)).reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const advance = own.filter((l) => !isLessonPast(l)).reduce((s, l) => s + paidAmountOf(l), 0);
+  const debt = own.filter((l) => isLessonPast(l)).reduce((s, l) => s + remainingAmountOf(l), 0);
   const balance = advance - debt;
   const sub = profile.subscription;
 
