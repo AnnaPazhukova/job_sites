@@ -1,6 +1,6 @@
 import { AlertCircle, BookOpen, Calendar as CalendarIcon, ChevronRight, CheckCircle2, Clock, Layers, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { Card, PageHeader } from "../components/ui";
-import { fmtMoney, isLessonPast, sumPrice, TODAY, TODAY_KEY, dateKey } from "../lib/utils";
+import { fmtMoney, isLessonPast, paidAmountOf, paymentStateOf, remainingAmountOf, sumPrice, TODAY, TODAY_KEY, dateKey } from "../lib/utils";
 import type { Homework, Lesson, MethodNote, Student, Task, ViewId } from "../lib/types";
 
 interface Props {
@@ -23,7 +23,7 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
 
   const income = days.map((d) => {
     const key = dateKey(d);
-    return sumPrice(activeLessons.filter((l) => l.date === key && l.paymentStatus === "paid"));
+    return activeLessons.filter((l) => l.date === key).reduce((s, l) => s + paidAmountOf(l), 0);
   });
 
   const growth = days.map((d) => {
@@ -34,9 +34,11 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
   // isLessonPast (end-of-lesson time), not just the calendar date, so a
   // lesson later today isn't already counted as received/owed before it's
   // even happened.
-  const paidPast = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && isLessonPast(l)));
-  const paidAdvance = sumPrice(activeLessons.filter((l) => l.paymentStatus === "paid" && !isLessonPast(l)));
-  const debt = sumPrice(activeLessons.filter((l) => l.paymentStatus !== "paid" && isLessonPast(l)));
+  const pastLessons = activeLessons.filter((l) => isLessonPast(l));
+  const futureLessons = activeLessons.filter((l) => !isLessonPast(l));
+  const paidPast = pastLessons.reduce((s, l) => s + paidAmountOf(l), 0);
+  const paidAdvance = futureLessons.reduce((s, l) => s + paidAmountOf(l), 0);
+  const debt = pastLessons.reduce((s, l) => s + remainingAmountOf(l), 0);
   const monthEnd = dateKey(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0));
   const monthForecast = sumPrice(activeLessons.filter((l) => l.date > TODAY_KEY && l.date <= monthEnd));
 
@@ -46,7 +48,7 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
   const scheduledHours = monthLessons.filter((l) => l.date > TODAY_KEY).reduce((s, l) => s + (Number(l.duration) || 0), 0) / 60;
 
   const pendingHomework = homework.filter((h) => h.status !== "done").length;
-  const missed = activeLessons.filter((l) => l.paymentStatus !== "paid" && l.date < TODAY_KEY).length;
+  const missed = activeLessons.filter((l) => paymentStateOf(l) !== "paid" && l.date < TODAY_KEY).length;
 
   return (
     <div>

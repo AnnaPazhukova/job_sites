@@ -121,6 +121,31 @@ export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
 }
 
+type PayableLesson = { price: number; paymentStatus: string; paidAmount?: number };
+
+// Amount actually paid toward a lesson's price. Lessons saved before partial
+// payment support only ever recorded the all-or-nothing paymentStatus flag,
+// so paidAmount is optional — fall back to deriving it from that flag.
+export function paidAmountOf(l: PayableLesson): number {
+  if (l.paidAmount != null) return l.paidAmount;
+  return l.paymentStatus === "paid" ? Number(l.price) || 0 : 0;
+}
+
+// What's still owed on this lesson — never negative (an overpayment isn't a debt).
+export function remainingAmountOf(l: PayableLesson): number {
+  return Math.max(0, (Number(l.price) || 0) - paidAmountOf(l));
+}
+
+export type PaymentState = "paid" | "partial" | "pending";
+
+export function paymentStateOf(l: PayableLesson): PaymentState {
+  const price = Number(l.price) || 0;
+  const paid = paidAmountOf(l);
+  if (price <= 0 || paid >= price) return "paid";
+  if (paid <= 0) return "pending";
+  return "partial";
+}
+
 // Adjacent lessons for the same student, in chronological order — powers
 // the "◀ Предыдущий / Следующий ▶" navigation inside the lesson modal, so
 // the tutor can page through one student's lessons without closing it.

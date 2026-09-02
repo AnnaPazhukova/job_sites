@@ -44,6 +44,11 @@ export interface Lesson {
   price: number;
   status: LessonStatus;
   paymentStatus: PaymentStatus;
+  /** Amount actually paid toward `price` so far — lets a partial payment be
+   * recorded instead of only the all-or-nothing `paymentStatus`. Older
+   * lessons never had this field; treat it as `price` when paymentStatus is
+   * "paid" and 0 otherwise (see paidAmountOf in lib/utils.ts). */
+  paidAmount?: number;
   comment?: string;
   /** Methodology topic covered in this lesson (see MethodNote). */
   noteId?: string;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { dateKey, isLessonPast, lessonLabel, lessonPillStyle, TODAY, WEEKDAYS_RU } from "../lib/utils";
+import { dateKey, isLessonPast, lessonLabel, lessonPillStyle, paymentStateOf, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
@@ -91,9 +91,16 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
     const color = students.find((s) => s.id === l.studentId)?.color;
     const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
-    if (l.paymentStatus === "paid") {
+    const state = paymentStateOf(l);
+    if (state === "paid") {
       return {
         className: isPast ? "bg-emerald-200 text-emerald-900 hover:bg-emerald-300" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+        style: undefined,
+      };
+    }
+    if (state === "partial") {
+      return {
+        className: isPast ? "bg-amber-200 text-amber-900 hover:bg-amber-300" : "bg-amber-50 text-amber-700 hover:bg-amber-100",
         style: undefined,
       };
     }
@@ -270,7 +277,11 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                       >
                         <div className="flex items-center gap-1">
                           {hasCustomColor && (
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.paymentStatus === "paid" ? "bg-emerald-500" : "bg-rose-400"}`} />
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                paymentStateOf(l) === "paid" ? "bg-emerald-500" : paymentStateOf(l) === "partial" ? "bg-amber-400" : "bg-rose-400"
+                              }`}
+                            />
                           )}
                           <span className="tabular-nums">{heightPx > 40 ? `${l.time}–${addMinutes(l.time, l.duration)}` : l.time}</span>
                         </div>
