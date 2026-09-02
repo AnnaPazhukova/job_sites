@@ -430,6 +430,7 @@ export function ScheduleView({
               studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
               defaultRate={editLesson.price}
               defaultDuration={editLesson.duration}
+              previousLesson={prev}
               lesson={editLesson}
               homework={homework}
               notes={notes}
