@@ -592,6 +592,7 @@ export function StudentDetailPage({
               studentGrade={student.grade}
               defaultRate={student.rate || 0}
               defaultDuration={student.duration || 60}
+              previousLesson={prev}
               lesson={editLesson}
               homework={homework}
               notes={notes}
@@ -641,6 +642,10 @@ interface LessonFormProps {
   defaultRate: number;
   defaultDuration: number;
   lesson: Lesson | null;
+  /** The student's previous lesson chronologically — its `nextPlan` (set while
+   * reviewing it) describes what was intended for *this* lesson, so it's
+   * surfaced here as a reference when this one hasn't happened yet. */
+  previousLesson?: Lesson | null;
   homework?: Homework[];
   notes?: MethodNote[];
   onAssignHomework?: (title: string, noteId?: string, due?: string, attachments?: Attachment[]) => void;
@@ -663,6 +668,7 @@ export function LessonFormModal({
   defaultRate,
   defaultDuration,
   lesson,
+  previousLesson,
   homework = [],
   notes = [],
   onAssignHomework,
@@ -711,6 +717,13 @@ export function LessonFormModal({
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
+  // Set while reviewing the previous lesson, this is exactly the info this
+  // (not-yet-happened) lesson is missing until the tutor fills it in below.
+  const prevPlan = !isPast ? previousLesson?.nextPlan?.trim() || "" : "";
+
+  function usePrevPlan() {
+    if (prevPlan) setComment(prevPlan);
+  }
 
   function toggleDay(d: number) {
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
@@ -930,11 +943,25 @@ export function LessonFormModal({
           </>
         )}
 
-        {isPast && (
+        {isEdit && (
           <>
             <Field label="Урок из методики">
               <MethodNotePicker notes={notes} value={noteId} onChange={setNoteId} defaultGrade={studentGrade} />
             </Field>
+
+            {prevPlan && (
+              <button
+                type="button"
+                onClick={usePrevPlan}
+                className="w-full text-left rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-2.5 text-sm text-[#2563EB] hover:bg-blue-100 transition"
+              >
+                <div className="font-medium text-xs uppercase tracking-wide mb-0.5">
+                  План с прошлого занятия{previousLesson ? ` (${fmtDateRu(previousLesson.date)})` : ""}
+                </div>
+                <div className="text-gray-700 line-clamp-3 whitespace-pre-wrap">{prevPlan}</div>
+                <div className="text-[11px] text-[#2563EB] mt-1">Нажмите, чтобы использовать как комментарий — текст можно будет изменить</div>
+              </button>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-5">
               <div className="space-y-4">
@@ -943,7 +970,7 @@ export function LessonFormModal({
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={5}
-                    placeholder="Как прошёл урок, что отработали, на что обратить внимание..."
+                    placeholder={isPast ? "Как прошёл урок, что отработали, на что обратить внимание..." : "Что планируете разобрать на этом занятии..."}
                   />
                 </Field>
                 <Field label="План на следующий урок">
@@ -954,7 +981,11 @@ export function LessonFormModal({
                     placeholder="Что разобрать в следующий раз..."
                   />
                 </Field>
-                <AttachmentsField attachments={lessonAttachments} onChange={setLessonAttachments} label="Запись урока (фото, PDF)" />
+                <AttachmentsField
+                  attachments={lessonAttachments}
+                  onChange={setLessonAttachments}
+                  label={isPast ? "Запись урока (фото, PDF)" : "Материалы к уроку (фото, PDF)"}
+                />
               </div>
 
               {lesson!.studentId && (
