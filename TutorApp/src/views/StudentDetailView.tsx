@@ -706,6 +706,13 @@ export function LessonFormModal({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (isEdit) {
+      // Homework typed into the form is normally saved via its own "Задать домашнее
+      // задание" / "Сохранить" controls, but those are easy to miss — commit any
+      // pending text here too so the main Save button never silently drops it.
+      if (isPast && lesson!.studentId) {
+        if (editingHw) saveHwEdit();
+        else if (!linkedHomework && hwText.trim()) assignHomework();
+      }
       onSave({
         id: lesson!.id,
         date,
