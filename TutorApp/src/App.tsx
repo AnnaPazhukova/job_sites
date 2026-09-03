@@ -222,6 +222,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   messages={messages}
                   setMessages={setMessages}
                   notes={notes}
+                  saveNotes={saveNotes}
                   selectedStudentId={selectedStudentId}
                   setView={setView}
                   showToast={showToast}
@@ -241,6 +242,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   messages={messages}
                   setMessages={setMessages}
                   notes={notes}
+                  saveNotes={saveNotes}
                   showToast={showToast}
                 />
               )}
@@ -252,6 +254,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   students={students}
                   lessons={lessons}
                   notes={notes}
+                  saveNotes={saveNotes}
                   onOpenNote={openNote}
                   showToast={showToast}
                 />
