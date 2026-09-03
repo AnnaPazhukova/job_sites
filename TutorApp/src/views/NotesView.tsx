@@ -22,6 +22,55 @@ function displaySubject(subject: string): string {
 }
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
+// Most topics are titled "N. ..." following the textbook sequence (e.g.
+// "15. Задание 9 — графы..."); within one subject they should read in that
+// order, not whatever order they happen to sit in storage (which shifts
+// around after bulk edits, imports, or content restores).
+function topicNumber(topic: string): number | null {
+  const m = topic.match(/^(\d+)\./);
+  return m ? Number(m[1]) : null;
+}
+
+// A grade taught over the year alternates between subjects (e.g. algebra и
+// geometry lessons interleaved week to week) rather than covering one
+// subject in a single block — that interleaving pattern already lives in
+// the stored order and must be kept. So this doesn't do one global sort
+// (which would cluster every subject's topics together, destroying the
+// interleaving); instead each subject's own topics are sorted by number
+// among themselves and dropped back into exactly the storage positions
+// that subject already occupied — same interleaving pattern, but each
+// subject's own sequence now actually counts up.
+function sortNumericWithinSubject(list: MethodNote[]): MethodNote[] {
+  // Grade+subject together — numbering restarts per grade too (each grade's
+  // "Математика"/"Алгебра"/etc has its own 1, 2, 3...), and grades never
+  // interleave with each other in the sidebar (each gets its own section).
+  const groupKey = (n: MethodNote) => `${n.grade}|${displaySubject(n.subject)}`;
+  const byGroup = new Map<string, MethodNote[]>();
+  for (const n of list) {
+    const key = groupKey(n);
+    const group = byGroup.get(key);
+    if (group) group.push(n);
+    else byGroup.set(key, [n]);
+  }
+  for (const [key, group] of byGroup) {
+    byGroup.set(
+      key,
+      [...group].sort((a, b) => {
+        const na = topicNumber(a.topic);
+        const nb = topicNumber(b.topic);
+        return na != null && nb != null ? na - nb : 0;
+      })
+    );
+  }
+  const cursors = new Map<string, number>();
+  return list.map((n) => {
+    const key = groupKey(n);
+    const i = cursors.get(key) || 0;
+    cursors.set(key, i + 1);
+    return byGroup.get(key)![i];
+  });
+}
+
 // Four tabs: Theory and Rules are grouped into one ("read together while
 // teaching the lesson"), Tasks/Test/Homework stay on their own tab each
 // (only one is relevant at a time, e.g. during the check or when assigning).
@@ -103,12 +152,13 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   const [query, setQuery] = useState("");
 
   const filteredNotes = useMemo(() => {
-    return notes.filter((n) => {
+    const filtered = notes.filter((n) => {
       if (gradeFilter !== "Все классы" && n.grade !== gradeFilter) return false;
       if (subjectFilter !== "Все предметы" && displaySubject(n.subject) !== subjectFilter) return false;
       if (query.trim() && !n.topic.toLowerCase().includes(query.trim().toLowerCase())) return false;
       return true;
     });
+    return sortNumericWithinSubject(filtered);
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
