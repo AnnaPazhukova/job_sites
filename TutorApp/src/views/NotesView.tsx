@@ -22,6 +22,19 @@ function displaySubject(subject: string): string {
 }
 const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 класс");
 
+// Most topics are titled "N. ..." following the textbook/curriculum
+// sequence (e.g. "15. Задание 9 — графы..."); the sidebar should show them
+// in that order rather than whatever order they happen to sit in storage
+// (insertion order — which shifts around after bulk edits, imports, or
+// content restores and stops matching the curriculum). Topics without a
+// leading number (e.g. most of 7 класс | Алгебра) have no number to sort
+// by, so they keep their existing relative order — sort() is stable, so
+// returning 0 for them leaves that order untouched.
+function topicNumber(topic: string): number | null {
+  const m = topic.match(/^(\d+)\./);
+  return m ? Number(m[1]) : null;
+}
+
 // Four tabs: Theory and Rules are grouped into one ("read together while
 // teaching the lesson"), Tasks/Test/Homework stay on their own tab each
 // (only one is relevant at a time, e.g. during the check or when assigning).
@@ -103,12 +116,23 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   const [query, setQuery] = useState("");
 
   const filteredNotes = useMemo(() => {
-    return notes.filter((n) => {
-      if (gradeFilter !== "Все классы" && n.grade !== gradeFilter) return false;
-      if (subjectFilter !== "Все предметы" && displaySubject(n.subject) !== subjectFilter) return false;
-      if (query.trim() && !n.topic.toLowerCase().includes(query.trim().toLowerCase())) return false;
-      return true;
-    });
+    return notes
+      .filter((n) => {
+        if (gradeFilter !== "Все классы" && n.grade !== gradeFilter) return false;
+        if (subjectFilter !== "Все предметы" && displaySubject(n.subject) !== subjectFilter) return false;
+        if (query.trim() && !n.topic.toLowerCase().includes(query.trim().toLowerCase())) return false;
+        return true;
+      })
+      .slice()
+      .sort((a, b) => {
+        // Group by subject first so topics numbered "1, 2, 3..." in one
+        // subject don't interleave with a different subject's own "1, 2, 3".
+        const subjectDiff = ALL_SUBJECTS.indexOf(displaySubject(a.subject)) - ALL_SUBJECTS.indexOf(displaySubject(b.subject));
+        if (subjectDiff !== 0) return subjectDiff;
+        const na = topicNumber(a.topic);
+        const nb = topicNumber(b.topic);
+        return na != null && nb != null ? na - nb : 0;
+      });
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
