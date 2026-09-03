@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, GripVertical, Layers, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Card, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "../components/Attachments";
-import { fmtDateRu, GRADES, lessonLabel, uid } from "../lib/utils";
+import { fmtDateRu, GRADES, lessonLabel, sortHomeworkNewestFirst, uid } from "../lib/utils";
 import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, Homework, Lesson, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Student, Task } from "../lib/types";
 
@@ -113,7 +113,7 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
-  const topicHomework = active ? homework.filter((h) => h.noteId === active.id) : [];
+  const topicHomework = active ? sortHomeworkNewestFirst(homework.filter((h) => h.noteId === active.id)) : [];
   const topicLessons = active
     ? lessons.filter((l) => l.noteId === active.id).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
     : [];
@@ -458,8 +458,6 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
                             <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
                             <div className="space-y-1.5 max-h-48 overflow-y-auto">
                               {topicHomework
-                                .slice()
-                                .reverse()
                                 .map((h) => (
                                   <div key={h.id} className="text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
                                     <div className="flex items-start justify-between gap-2">
