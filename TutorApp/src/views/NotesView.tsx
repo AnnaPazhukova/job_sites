@@ -27,8 +27,7 @@ const NOTE_GRADES = GRADES.filter((g) => g !== "10 класс" && g !== "11 кл
 // (only one is relevant at a time, e.g. during the check or when assigning).
 const TAB_GROUPS: { id: string; label: string; keys: MethodNoteTabKey[] }[] = [
   { id: "theory_rules", label: "Теория и правила", keys: ["theory", "rules"] },
-  { id: "tasks", label: "Задания", keys: ["tasks"] },
-  { id: "test", label: "Тест", keys: ["test"] },
+  { id: "tasks_test", label: "Задания и тест", keys: ["tasks", "test"] },
   { id: "homework", label: "Д/З", keys: ["homework"] },
 ];
 const TAB_LABELS: Record<MethodNoteTabKey, string> = {
@@ -195,19 +194,17 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
     showToast("Название темы обновлено");
   };
 
-  const handleAttachmentsChange = (tabKey: MethodNoteTabKey, next: Attachment[]) => {
+  // Every tab group (even a single-section one like Д/З) shares one file
+  // zone across all its keys — everything is stored under the group's first
+  // key; the rest are dropped so old per-section attachments from before a
+  // group was merged (e.g. Rules, or Тест) don't linger as an invisible
+  // duplicate the tutor can no longer see.
+  const handleGroupAttachmentsChange = (group: { keys: MethodNoteTabKey[] }, next: Attachment[]) => {
     if (!active) return;
-    const nextAttachments: MethodNoteAttachments = { ...(active.attachments || {}), [tabKey]: next };
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
-  };
-
-  // Theory and Rules share one file zone (they're read together on the same
-  // tab) — everything is stored under the "theory" key; "rules" is dropped
-  // so old per-section attachments don't linger as an invisible duplicate.
-  const handleTheoryRulesAttachmentsChange = (next: Attachment[]) => {
-    if (!active) return;
-    const { rules: _rulesFiles, ...restAttachments } = active.attachments || {};
-    const nextAttachments: MethodNoteAttachments = { ...restAttachments, theory: next };
+    const [primaryKey, ...dropKeys] = group.keys;
+    const restAttachments = { ...(active.attachments || {}) };
+    for (const key of dropKeys) delete restAttachments[key];
+    const nextAttachments: MethodNoteAttachments = { ...restAttachments, [primaryKey]: next };
     saveNotes(notes.map((n) => (n.id === active.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
   };
 
@@ -437,10 +434,7 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
 
               {(() => {
                 const group = TAB_GROUPS.find((g) => g.id === activeGroup) || TAB_GROUPS[0];
-                const isTheoryRules = group.id === "theory_rules";
-                const sharedFiles = isTheoryRules
-                  ? [...(active.attachments?.theory || []), ...(active.attachments?.rules || [])]
-                  : active.attachments?.[group.keys[0]] || [];
+                const sharedFiles = group.keys.flatMap((k) => active.attachments?.[k] || []);
                 return (
                   <>
                     {group.keys.map((tab, i) => (
@@ -488,8 +482,8 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
                       )}
                       <AttachmentsField
                         attachments={sharedFiles}
-                        onChange={isTheoryRules ? handleTheoryRulesAttachmentsChange : (next) => handleAttachmentsChange(group.keys[0], next)}
-                        label={isTheoryRules ? "Файлы к теории и правилам" : `Файлы к разделу «${group.label}»`}
+                        onChange={(next) => handleGroupAttachmentsChange(group, next)}
+                        label={`Файлы к разделу «${group.label}»`}
                       />
                     </div>
 
