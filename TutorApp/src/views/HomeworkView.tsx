@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   students: Student[];
   lessons: Lesson[];
   notes: MethodNote[];
+  saveNotes: (n: MethodNote[]) => void;
   onOpenNote: (id: string) => void;
   showToast: (t: string) => void;
 }
@@ -29,7 +30,7 @@ function effectiveStatus(h: Homework) {
   return status;
 }
 
-export function HomeworkView({ homework, setHomework, students, lessons, notes, onOpenNote, showToast }: Props) {
+export function HomeworkView({ homework, setHomework, students, lessons, notes, saveNotes, onOpenNote, showToast }: Props) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -43,6 +44,8 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
 
   function updateHomework(id: string, patch: Partial<Homework>) {
     setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    const updated = homework.find((h) => h.id === id);
+    if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     setEditingHw(null);
     showToast("Домашнее задание обновлено");
   }
@@ -69,7 +72,9 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     lessonId?: string;
     attachments: Attachment[];
   }) {
-    setHomework([{ id: uid(), status: "assigned", createdAt: Date.now(), ...data }, ...homework]);
+    const created: Homework = { id: uid(), status: "assigned", createdAt: Date.now(), ...data };
+    setHomework([created, ...homework]);
+    syncHomeworkAttachmentsToNote(created, notes, saveNotes);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");
   }

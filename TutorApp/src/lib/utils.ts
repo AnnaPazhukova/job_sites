@@ -1,4 +1,4 @@
-import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, Student } from "./types";
+import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, MethodNote, MethodNoteAttachments, Student } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -200,6 +200,25 @@ export function buildHomeworkAssignment(
     at: Date.now(),
   };
   return { homework, message };
+}
+
+// A homework attachment is also useful as reference material for the topic
+// itself — e.g. a worksheet photo attached once should show up in every
+// future lesson on that topic, not just this one assignment. Copies (never
+// moves) the homework's files into the linked note's own Д/З attachments
+// (MethodNote.attachments.homework), deduped by attachment id so calling
+// this again for the same homework (e.g. after an edit) doesn't pile up
+// duplicates. No-ops when the homework has no linked topic or no files.
+export function syncHomeworkAttachmentsToNote(homework: Homework, notes: MethodNote[], saveNotes: (next: MethodNote[]) => void): void {
+  if (!homework.noteId || !homework.attachments?.length) return;
+  const note = notes.find((n) => n.id === homework.noteId);
+  if (!note) return;
+  const existing = note.attachments?.homework || [];
+  const existingIds = new Set(existing.map((a) => a.id));
+  const newFiles = homework.attachments.filter((a) => !existingIds.has(a.id));
+  if (newFiles.length === 0) return;
+  const nextAttachments: MethodNoteAttachments = { ...(note.attachments || {}), homework: [...existing, ...newFiles] };
+  saveNotes(notes.map((n) => (n.id === note.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
 }
 
 // Homework is created from two different places (this file's own

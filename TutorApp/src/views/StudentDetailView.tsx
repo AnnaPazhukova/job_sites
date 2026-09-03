@@ -39,6 +39,7 @@ import {
   paymentStateOf,
   sortHomeworkNewestFirst,
   SUBSCRIPTION_SIZES,
+  syncHomeworkAttachmentsToNote,
   TODAY_KEY,
   uid,
   type RecurrenceEnd,
@@ -66,6 +67,7 @@ interface Props {
   messages: MessagesByStudent;
   setMessages: (m: MessagesByStudent) => void;
   notes: MethodNote[];
+  saveNotes: (n: MethodNote[]) => void;
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
@@ -85,6 +87,7 @@ export function StudentDetailPage({
   messages,
   setMessages,
   notes,
+  saveNotes,
   selectedStudentId,
   setView,
   showToast,
@@ -241,11 +244,14 @@ export function StudentDetailPage({
     const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons, { due, attachments });
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
+    syncHomeworkAttachmentsToNote(hw, notes, saveNotes);
     showToast("Домашнее задание задано");
   }
 
   function handleUpdateHomework(id: string, patch: Partial<Homework>) {
     setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    const updated = homework.find((h) => h.id === id);
+    if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     setEditingHw(null);
     showToast("Домашнее задание обновлено");
   }

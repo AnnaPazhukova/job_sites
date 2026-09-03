@@ -11,6 +11,7 @@ import {
   lessonLabel,
   lessonPillStyle,
   MONTHS_RU,
+  syncHomeworkAttachmentsToNote,
   TODAY,
   WEEKDAYS_RU,
   uid,
@@ -38,6 +39,7 @@ interface Props {
   messages: MessagesByStudent;
   setMessages: (m: MessagesByStudent) => void;
   notes: MethodNote[];
+  saveNotes: (n: MethodNote[]) => void;
   showToast: (t: string) => void;
 }
 
@@ -52,6 +54,7 @@ export function ScheduleView({
   messages,
   setMessages,
   notes,
+  saveNotes,
   showToast,
 }: Props) {
   const [mode, setMode] = useState<"month" | "week">("week");
@@ -182,11 +185,14 @@ export function ScheduleView({
     const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons, { due, attachments });
     setHomework([...homework, hw]);
     setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
+    syncHomeworkAttachmentsToNote(hw, notes, saveNotes);
     showToast("Домашнее задание задано");
   }
 
   function handleUpdateHomework(id: string, patch: Partial<Homework>) {
     setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    const updated = homework.find((h) => h.id === id);
+    if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     showToast("Домашнее задание обновлено");
   }
 
