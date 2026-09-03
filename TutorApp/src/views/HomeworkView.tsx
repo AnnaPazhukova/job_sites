@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 
 interface Props {
@@ -47,11 +47,13 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     showToast("Домашнее задание обновлено");
   }
 
-  const filtered = homework.filter((h) => {
-    const matchQ = h.title.toLowerCase().includes(query.toLowerCase()) || h.studentName.toLowerCase().includes(query.toLowerCase());
-    const matchS = statusFilter === "all" || effectiveStatus(h) === statusFilter;
-    return matchQ && matchS;
-  });
+  const filtered = sortHomeworkNewestFirst(
+    homework.filter((h) => {
+      const matchQ = h.title.toLowerCase().includes(query.toLowerCase()) || h.studentName.toLowerCase().includes(query.toLowerCase());
+      const matchS = statusFilter === "all" || effectiveStatus(h) === statusFilter;
+      return matchQ && matchS;
+    })
+  );
 
   function markDone(id: string) {
     setHomework(homework.map((h) => (h.id === id ? { ...h, status: "done" as HomeworkStatus } : h)));
@@ -67,7 +69,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     lessonId?: string;
     attachments: Attachment[];
   }) {
-    setHomework([{ id: uid(), status: "assigned", ...data }, ...homework]);
+    setHomework([{ id: uid(), status: "assigned", createdAt: Date.now(), ...data }, ...homework]);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");
   }

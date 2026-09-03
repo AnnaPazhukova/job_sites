@@ -188,6 +188,7 @@ export function buildHomeworkAssignment(
     title,
     due,
     status: "assigned",
+    createdAt: Date.now(),
     lessonId: lesson.id,
     noteId: lesson.noteId,
     attachments: opts?.attachments?.length ? opts.attachments : undefined,
@@ -199,6 +200,18 @@ export function buildHomeworkAssignment(
     at: Date.now(),
   };
   return { homework, message };
+}
+
+// Homework is created from two different places (this file's own
+// buildHomeworkAssignment and HomeworkView's standalone "Задать ДЗ") that
+// don't agree on whether new items get appended or prepended to the stored
+// array, so array order alone was never a reliable stand-in for "newest
+// first" — sort by the actual createdAt instead. Records saved before this
+// field existed sort as if createdAt were 0 (oldest), which — since
+// Array.prototype.sort is stable — keeps their relative order but places
+// them after every timestamped record.
+export function sortHomeworkNewestFirst<T extends { createdAt?: number }>(list: T[]): T[] {
+  return [...list].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
 export type RecurrenceFreq = "daily" | "weekly" | "monthly";

@@ -3,7 +3,20 @@ import { Bell, BookOpen, Calendar, Check, CheckCircle2, ChevronLeft, ChevronRigh
 import { Avatar, Card, EmptyState, GhostButton, Modal, PageHeader, PrimaryButton } from "./components/ui";
 import { AttachmentList, AttachmentsField, LargeAttachmentList } from "./components/Attachments";
 import { MiniCalendar } from "./components/MiniCalendar";
-import { adjacentLessons, dateKey, durationLabel, fmtDateRu, fmtMoney, isLessonPast, MONTHS_RU, normalizeHomeworkStatus, paidAmountOf, remainingAmountOf, TODAY } from "./lib/utils";
+import {
+  adjacentLessons,
+  dateKey,
+  durationLabel,
+  fmtDateRu,
+  fmtMoney,
+  isLessonPast,
+  MONTHS_RU,
+  normalizeHomeworkStatus,
+  paidAmountOf,
+  remainingAmountOf,
+  sortHomeworkNewestFirst,
+  TODAY,
+} from "./lib/utils";
 import { getWeekDays, WeekView } from "./views/WeekView";
 import {
   fetchStudentHomework,
@@ -40,14 +53,14 @@ const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> =
 // anything already sent off or already reviewed.
 const HW_SORT_ORDER: Record<HomeworkStatus, number> = { assigned: 0, submitted: 1, done: 2 };
 
-// Homework has no createdAt field, but new items are always appended to the
-// stored array (see App.tsx/HomeworkView.tsx's setHomework([...homework,
-// created])), so array position already reflects true assignment order —
-// reversing it puts the newest first. Array.prototype.sort is stable, so
-// the status grouping below doesn't disturb that newest-first order within
-// each group.
+// Groups by status first (not-yet-submitted work needs attention before
+// anything already sent off or reviewed), newest-assigned first within each
+// group — Array.prototype.sort is stable, so sorting by createdAt first and
+// then re-sorting by status preserves that newest-first order within groups.
 function sortedHomework(homework: Homework[]): Homework[] {
-  return [...homework].reverse().sort((a, b) => HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)]);
+  return sortHomeworkNewestFirst(homework).sort(
+    (a, b) => HW_SORT_ORDER[normalizeHomeworkStatus(a.status)] - HW_SORT_ORDER[normalizeHomeworkStatus(b.status)]
+  );
 }
 
 const OTHER_FILTERS: { id: "all" | "submitted" | "done"; label: string }[] = [

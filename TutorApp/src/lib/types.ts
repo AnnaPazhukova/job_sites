@@ -80,6 +80,10 @@ export interface Homework {
   title: string;
   due: string | null;
   status: HomeworkStatus;
+  /** When this was assigned — lets homework lists sort newest-first. Absent
+   * on records created before this field existed; treat as older than any
+   * timestamped record (see homework list sorts). */
+  createdAt?: number;
   noteId?: string;
   lessonId?: string;
   attachments?: Attachment[];

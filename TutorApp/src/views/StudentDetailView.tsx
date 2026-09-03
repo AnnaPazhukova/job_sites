@@ -37,6 +37,7 @@ import {
   normalizeHomeworkStatus,
   paidAmountOf,
   paymentStateOf,
+  sortHomeworkNewestFirst,
   SUBSCRIPTION_SIZES,
   TODAY_KEY,
   uid,
@@ -185,7 +186,7 @@ export function StudentDetailPage({
     .filter((l) => l.studentId === student.id)
     .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
   const paidLessons = studentLessons.filter((l) => paymentStateOf(l) === "paid");
-  const studentHomework = homework.filter((h) => h.studentId === student.id);
+  const studentHomework = sortHomeworkNewestFirst(homework.filter((h) => h.studentId === student.id));
   const currentMonthPrefix = TODAY_KEY.slice(0, 7);
   const monthLessons = studentLessons.filter((l) => l.status !== "cancelled" && l.date.slice(0, 7) === currentMonthPrefix).length;
   const totalEarned = studentLessons.reduce((s, l) => s + paidAmountOf(l), 0);
