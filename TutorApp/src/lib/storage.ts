@@ -35,6 +35,19 @@ export function setDataAdapter(adapter: DataAdapter) {
   dataAdapter = adapter;
 }
 
+// useStore updates its local state immediately (so typing/clicking feels
+// instant) and persists in the background — a save that then fails would
+// otherwise be silently lost: the screen keeps showing the new value until
+// the next reload quietly reverts it. Registering a handler here (App.tsx
+// does this once, wiring it to a toast) is how that failure becomes visible
+// instead of invisible data loss.
+type PersistErrorHandler = (key: string, error: unknown) => void;
+let onPersistError: PersistErrorHandler | null = null;
+
+export function setPersistErrorHandler(handler: PersistErrorHandler | null) {
+  onPersistError = handler;
+}
+
 export function useStore<T>(key: string, initial: T): [T, (next: T) => void, boolean] {
   const [value, setValue] = useState<T>(initial);
   const [loaded, setLoaded] = useState(false);
@@ -57,7 +70,7 @@ export function useStore<T>(key: string, initial: T): [T, (next: T) => void, boo
   const persist = useCallback(
     (next: T) => {
       setValue(next);
-      void dataAdapter.set(key, next);
+      dataAdapter.set(key, next).catch((err) => onPersistError?.(key, err));
     },
     [key]
   );
