@@ -13,21 +13,25 @@ create table if not exists public.app_kv (
 
 alter table public.app_kv enable row level security;
 
+-- auth.uid() is wrapped in a scalar subquery ((select auth.uid())) rather
+-- than called bare — Postgres can then evaluate it once per statement
+-- instead of re-invoking it for every row, per Supabase's RLS performance
+-- advisor (https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select).
 drop policy if exists "read own data" on public.app_kv;
 create policy "read own data" on public.app_kv
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 drop policy if exists "write own data" on public.app_kv;
 create policy "write own data" on public.app_kv
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
 drop policy if exists "update own data" on public.app_kv;
 create policy "update own data" on public.app_kv
-  for update using (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id);
 
 drop policy if exists "delete own data" on public.app_kv;
 create policy "delete own data" on public.app_kv
-  for delete using (auth.uid() = user_id);
+  for delete using ((select auth.uid()) = user_id);
 
 -- File attachments (homework, methodology lessons): one public bucket,
 -- files stored under a per-user folder (<user_id>/...), writable only by
@@ -77,11 +81,13 @@ create table if not exists public.student_invites (
 
 alter table public.student_invites drop column if exists used;
 
+create index if not exists student_invites_tutor_id_idx on public.student_invites (tutor_id);
+
 alter table public.student_invites enable row level security;
 
 drop policy if exists "tutor manages own invites" on public.student_invites;
 create policy "tutor manages own invites" on public.student_invites
-  for all using (auth.uid() = tutor_id) with check (auth.uid() = tutor_id);
+  for all using ((select auth.uid()) = tutor_id) with check ((select auth.uid()) = tutor_id);
 
 -- Lets a student (no Supabase Auth session — see the comment above) upload
 -- attachments too: their folder is "portal-<code>" instead of auth.uid(),

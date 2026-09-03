@@ -11,7 +11,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { useStore } from "./lib/storage";
+import { setPersistErrorHandler, useStore } from "./lib/storage";
 import { isLessonPast } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
@@ -60,6 +60,14 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     setToast(text);
     setTimeout(() => setToast(null), 2200);
   }, []);
+
+  // Without this, a save that Supabase rejects (offline, RLS, quota) fails
+  // silently — the screen keeps the new value until the next reload quietly
+  // reverts it. See setPersistErrorHandler in lib/storage.ts.
+  useEffect(() => {
+    setPersistErrorHandler(() => showToast("Не удалось сохранить — проверьте соединение и повторите"));
+    return () => setPersistErrorHandler(null);
+  }, [showToast]);
 
   // A toast is a confirmation for whatever screen it appeared on — if the
   // tutor then navigates elsewhere (not as part of that same action, e.g.
