@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { setPersistErrorHandler, useStore } from "./lib/storage";
+import { StaleWriteError } from "./lib/supabaseStorage";
 import { isLessonPast } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
@@ -61,11 +62,20 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     setTimeout(() => setToast(null), 2200);
   }, []);
 
-  // Without this, a save that Supabase rejects (offline, RLS, quota) fails
-  // silently — the screen keeps the new value until the next reload quietly
-  // reverts it. See setPersistErrorHandler in lib/storage.ts.
+  // Without this, a save that Supabase rejects (offline, RLS, quota, or a
+  // stale-write conflict — see StaleWriteError in lib/supabaseStorage.ts)
+  // fails silently — the screen keeps the new value until the next reload
+  // quietly reverts it. A stale-write conflict specifically means this tab's
+  // copy of that data is out of date (changed elsewhere since this tab
+  // loaded it), so the fix is a refresh rather than a retry.
   useEffect(() => {
-    setPersistErrorHandler(() => showToast("Не удалось сохранить — проверьте соединение и повторите"));
+    setPersistErrorHandler((_key, err) => {
+      if (err instanceof StaleWriteError) {
+        showToast("Данные изменились в другом месте — обновите страницу и повторите");
+      } else {
+        showToast("Не удалось сохранить — проверьте соединение и повторите");
+      }
+    });
     return () => setPersistErrorHandler(null);
   }, [showToast]);
 
