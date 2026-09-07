@@ -98,12 +98,6 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
         style: undefined,
       };
     }
-    if (state === "partial") {
-      return {
-        className: isPast ? "bg-amber-200 text-amber-900 hover:bg-amber-300" : "bg-amber-50 text-amber-700 hover:bg-amber-100",
-        style: undefined,
-      };
-    }
     return {
       className: isPast ? "bg-blue-200 text-blue-900 hover:bg-blue-300" : "bg-[#EEF2FF] text-[#2563EB] hover:bg-[#E0E9FF]",
       style: undefined,
@@ -278,9 +272,7 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
                         <div className="flex items-center gap-1">
                           {hasCustomColor && (
                             <span
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                paymentStateOf(l) === "paid" ? "bg-emerald-500" : paymentStateOf(l) === "partial" ? "bg-amber-400" : "bg-rose-400"
-                              }`}
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${paymentStateOf(l) === "paid" ? "bg-emerald-500" : "bg-rose-400"}`}
                             />
                           )}
                           <span className="tabular-nums">{heightPx > 40 ? `${l.time}–${addMinutes(l.time, l.duration)}` : l.time}</span>
