@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
@@ -14,18 +14,21 @@ import {
 import { setPersistErrorHandler, useStore } from "./lib/storage";
 import { StaleWriteError } from "./lib/supabaseStorage";
 import { isLessonPast, paymentStateOf } from "./lib/utils";
-import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
 
-import { StudentsView } from "./views/StudentsView";
-import { StudentDetailPage } from "./views/StudentDetailView";
-import { GroupsView } from "./views/GroupsView";
-import { ScheduleView } from "./views/ScheduleView";
-import { MessagesView } from "./views/MessagesView";
-import { HomeworkView } from "./views/HomeworkView";
-import { TasksView } from "./views/TasksView";
-import { NotesView } from "./views/NotesView";
-import { StatsView } from "./views/StatsView";
+// Each view (and the methodology template library that NotesView pulls in)
+// is loaded only once the tutor actually opens that section, instead of all
+// of them — plus their combined static content — shipping in the initial
+// bundle every visitor downloads up front.
+const StudentsView = lazy(() => import("./views/StudentsView").then((m) => ({ default: m.StudentsView })));
+const StudentDetailPage = lazy(() => import("./views/StudentDetailView").then((m) => ({ default: m.StudentDetailPage })));
+const GroupsView = lazy(() => import("./views/GroupsView").then((m) => ({ default: m.GroupsView })));
+const ScheduleView = lazy(() => import("./views/ScheduleView").then((m) => ({ default: m.ScheduleView })));
+const MessagesView = lazy(() => import("./views/MessagesView").then((m) => ({ default: m.MessagesView })));
+const HomeworkView = lazy(() => import("./views/HomeworkView").then((m) => ({ default: m.HomeworkView })));
+const TasksView = lazy(() => import("./views/TasksView").then((m) => ({ default: m.TasksView })));
+const NotesView = lazy(() => import("./views/NotesView").then((m) => ({ default: m.NotesView })));
+const StatsView = lazy(() => import("./views/StatsView").then((m) => ({ default: m.StatsView })));
 
 const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon; disabled?: boolean }[] = [
   { id: "students", label: "Мои ученики", icon: Users },
@@ -105,13 +108,17 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     setView("student-detail");
   }, []);
 
-  // Seed the task bank & methodology library once, on first run.
+  // Seed the task bank & methodology library once, on first run. Loaded on
+  // demand rather than imported at the top of the file — this content is
+  // sizeable and, past that first run, never needed again.
   useEffect(() => {
     if (!seedFlagsLoaded) return;
     if (seedFlags.contentV1) return;
-    saveTasks([...tasks, ...SEED_TASKS_DATA]);
-    saveNotes([...notes, ...SEED_NOTES_DATA]);
-    saveSeedFlags({ ...seedFlags, contentV1: true });
+    import("./data/seedContent").then(({ SEED_TASKS_DATA, SEED_NOTES_DATA }) => {
+      saveTasks([...tasks, ...SEED_TASKS_DATA]);
+      saveNotes([...notes, ...SEED_NOTES_DATA]);
+      saveSeedFlags({ ...seedFlags, contentV1: true });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedFlagsLoaded]);
 
@@ -197,7 +204,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
           {!studentsLoaded ? (
             <div className="py-24 text-center text-gray-400">Загрузка данных...</div>
           ) : (
-            <>
+            <Suspense fallback={<div className="py-24 text-center text-gray-400">Загрузка...</div>}>
               {view === "students" && (
                 <div>
                   <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-gray-100 mb-4">
@@ -288,7 +295,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                 />
               )}
               {view === "stats" && <StatsView lessons={lessons} students={students} homework={homework} tasks={tasks} notes={notes} setView={setView} />}
-            </>
+            </Suspense>
           )}
         </main>
       </div>
