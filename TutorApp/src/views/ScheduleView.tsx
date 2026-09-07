@@ -18,7 +18,7 @@ import {
   type RecurrenceEnd,
   type RecurrenceFreq,
 } from "../lib/utils";
-import type { Attachment, Group, Homework, Lesson, MessagesByStudent, MethodNote, Student } from "../lib/types";
+import type { Attachment, Group, Homework, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { MiniCalendar } from "../components/MiniCalendar";
@@ -133,12 +133,14 @@ export function ScheduleView({
   function addLesson(data: Partial<Lesson> & { occurrences?: string[] }) {
     const { occurrences, ...base } = data;
     const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
+    const seriesId = dates.length > 1 ? uid() : undefined;
     const created: Lesson[] = dates.map((date) => ({
       ...(base as Omit<Lesson, "id" | "date" | "status" | "paymentStatus">),
       id: uid(),
       date,
       status: "scheduled",
       paymentStatus: "pending",
+      seriesId,
     }));
     setLessons([...lessons, ...created]);
     setShowAdd(false);
@@ -178,11 +180,18 @@ export function ScheduleView({
     setEditLesson(null);
   }
 
-  function deleteLessonEdit(id: string) {
+  function deleteLessonEdit(id: string, scope: LessonDeleteScope = "this") {
     const lesson = lessons.find((l) => l.id === id);
-    if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
-    setLessons(lessons.filter((l) => l.id !== id));
-    showToast("Занятие удалено");
+    if (!lesson) return;
+    const toDelete =
+      scope === "this" || !lesson.seriesId
+        ? [lesson]
+        : lessons.filter((l) => l.seriesId === lesson.seriesId && (scope === "all" || l.date >= lesson.date));
+    const refund = toDelete.filter((l) => l.subscriptionDeducted).length;
+    if (refund > 0) applySubscriptionDelta(lesson.studentId, refund);
+    const idsToDelete = new Set(toDelete.map((l) => l.id));
+    setLessons(lessons.filter((l) => !idsToDelete.has(l.id)));
+    showToast(toDelete.length > 1 ? `Удалено занятий: ${toDelete.length}` : "Занятие удалено");
     setEditLesson(null);
   }
 
@@ -464,6 +473,7 @@ export function ScheduleView({
               subscription={students.find((s) => s.id === editLesson.studentId)?.subscription}
               previousLesson={prev}
               lesson={editLesson}
+              seriesSize={editLesson.seriesId ? lessons.filter((l) => l.seriesId === editLesson.seriesId).length : 0}
               homework={homework}
               notes={notes}
               onAssignHomework={handleAssignHomework}
@@ -471,7 +481,7 @@ export function ScheduleView({
               onClose={() => setEditLesson(null)}
               onSave={saveLessonEdit}
               onCancelLesson={() => cancelLessonEdit(editLesson.id)}
-              onDeleteLesson={() => deleteLessonEdit(editLesson.id)}
+              onDeleteLesson={(scope) => deleteLessonEdit(editLesson.id, scope)}
               onMoveLesson={(date, time) => moveLesson(editLesson.id, date, time)}
               onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
               onNextLesson={next ? () => setEditLesson(next) : undefined}

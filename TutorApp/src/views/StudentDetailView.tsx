@@ -48,7 +48,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal } from "./HomeworkView";
-import type { Attachment, Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, Subscription, ViewId } from "../lib/types";
+import type { Attachment, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, Student, Subscription, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
 
@@ -219,6 +219,7 @@ export function StudentDetailPage({
     } else {
       const { occurrences, ...base } = data;
       const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
+      const seriesId = dates.length > 1 ? uid() : undefined;
       const created: Lesson[] = dates.map((date) => ({
         ...(base as Omit<Lesson, "id" | "date" | "studentId" | "title" | "status" | "paymentStatus">),
         id: uid(),
@@ -227,6 +228,7 @@ export function StudentDetailPage({
         title: student!.name,
         status: "scheduled",
         paymentStatus: "pending",
+        seriesId,
       }));
       setLessons([...lessons, ...created]);
       showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено");
@@ -244,11 +246,18 @@ export function StudentDetailPage({
     setEditLesson(null);
   }
 
-  function deleteLesson(id: string) {
+  function deleteLesson(id: string, scope: LessonDeleteScope = "this") {
     const lesson = lessons.find((l) => l.id === id);
-    if (lesson?.subscriptionDeducted) applySubscriptionDelta(1);
-    setLessons(lessons.filter((l) => l.id !== id));
-    showToast("Занятие удалено");
+    if (!lesson) return;
+    const toDelete =
+      scope === "this" || !lesson.seriesId
+        ? [lesson]
+        : lessons.filter((l) => l.seriesId === lesson.seriesId && (scope === "all" || l.date >= lesson.date));
+    const refund = toDelete.filter((l) => l.subscriptionDeducted).length;
+    if (refund > 0) applySubscriptionDelta(refund);
+    const idsToDelete = new Set(toDelete.map((l) => l.id));
+    setLessons(lessons.filter((l) => !idsToDelete.has(l.id)));
+    showToast(toDelete.length > 1 ? `Удалено занятий: ${toDelete.length}` : "Занятие удалено");
     setShowLessonForm(false);
     setEditLesson(null);
   }
@@ -627,6 +636,7 @@ export function StudentDetailPage({
               subscription={student.subscription}
               previousLesson={prev}
               lesson={editLesson}
+              seriesSize={editLesson?.seriesId ? lessons.filter((l) => l.seriesId === editLesson.seriesId).length : 0}
               homework={homework}
               notes={notes}
               onAssignHomework={handleAssignHomework}
@@ -637,7 +647,7 @@ export function StudentDetailPage({
               }}
               onSave={saveLesson}
               onCancelLesson={editLesson ? () => cancelLesson(editLesson.id) : null}
-              onDeleteLesson={editLesson ? () => deleteLesson(editLesson.id) : undefined}
+              onDeleteLesson={editLesson ? (scope) => deleteLesson(editLesson.id, scope) : undefined}
               onMoveLesson={editLesson ? (date, time) => moveLesson(editLesson.id, date, time) : undefined}
               onPrevLesson={prev ? () => setEditLesson(prev) : undefined}
               onNextLesson={next ? () => setEditLesson(next) : undefined}
@@ -682,6 +692,10 @@ interface LessonFormProps {
    * reviewing it) describes what was intended for *this* lesson, so it's
    * surfaced here as a reference when this one hasn't happened yet. */
   previousLesson?: Lesson | null;
+  /** Count of lessons sharing this lesson's seriesId (including itself) — 0
+   * or 1 means it isn't really part of a recurring series, so deleting it
+   * just asks for a plain confirmation instead of offering a scope choice. */
+  seriesSize?: number;
   homework?: Homework[];
   notes?: MethodNote[];
   onAssignHomework?: (title: string, noteId?: string, due?: string, attachments?: Attachment[]) => void;
@@ -690,7 +704,7 @@ interface LessonFormProps {
   onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
   onCancelLesson: (() => void) | null;
   /** Permanently removes this lesson (unlike onCancelLesson, which just marks it cancelled). */
-  onDeleteLesson?: () => void;
+  onDeleteLesson?: (scope: LessonDeleteScope) => void;
   /** Reschedules just this lesson instance (by date+time) — never touches other lessons in a recurring series. */
   onMoveLesson?: (date: string, time: string) => void;
   /** Adjacent lessons for the same student — set to switch the modal to that lesson without closing it. */
@@ -706,6 +720,7 @@ export function LessonFormModal({
   subscription,
   lesson,
   previousLesson,
+  seriesSize = 0,
   homework = [],
   notes = [],
   onAssignHomework,
@@ -719,6 +734,7 @@ export function LessonFormModal({
   onNextLesson,
 }: LessonFormProps) {
   const isEdit = !!lesson;
+  const [showDeleteScope, setShowDeleteScope] = useState(false);
   const [date, setDate] = useState(lesson?.date || TODAY_KEY);
   const [time, setTime] = useState(lesson?.time || "15:00");
   const [duration, setDuration] = useState(lesson?.duration || defaultDuration || 60);
@@ -853,6 +869,7 @@ export function LessonFormModal({
   }
 
   return (
+    <>
     <Modal
       title={isPast ? `Урок · ${fmtDateRu(lesson!.date)}` : isEdit ? "Занятие" : "Добавление занятия"}
       onClose={onClose}
@@ -861,7 +878,13 @@ export function LessonFormModal({
       headerActions={
         isEdit && onDeleteLesson ? (
           <button
-            onClick={() => window.confirm("Удалить это занятие насовсем? Это действие нельзя отменить.") && onDeleteLesson()}
+            onClick={() => {
+              if (seriesSize > 1) {
+                setShowDeleteScope(true);
+              } else if (window.confirm("Удалить это занятие насовсем? Это действие нельзя отменить.")) {
+                onDeleteLesson("this");
+              }
+            }}
             className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
             title="Удалить занятие"
           >
@@ -1200,5 +1223,51 @@ export function LessonFormModal({
         </div>
       </form>
     </Modal>
+    {showDeleteScope && onDeleteLesson && (
+      <DeleteRecurringDialog
+        onCancel={() => setShowDeleteScope(false)}
+        onConfirm={(scope) => {
+          setShowDeleteScope(false);
+          onDeleteLesson(scope);
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+function DeleteRecurringDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (scope: LessonDeleteScope) => void }) {
+  const [scope, setScope] = useState<LessonDeleteScope>("this");
+  const OPTIONS: { value: LessonDeleteScope; label: string }[] = [
+    { value: "this", label: "Только это занятие" },
+    { value: "following", label: "Это и последующие занятия" },
+    { value: "all", label: "Все занятия" },
+  ];
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+      <div className="bg-white w-full max-w-sm rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-bold text-lg mb-4">Удаление повторяющегося занятия</h3>
+        <div className="space-y-0.5 mb-5">
+          {OPTIONS.map((o) => (
+            <label key={o.value} className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-gray-50 cursor-pointer text-sm">
+              <input type="radio" name="delete-scope" checked={scope === o.value} onChange={() => setScope(o.value)} className="w-4 h-4 accent-[#2563EB]" />
+              {o.label}
+            </label>
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-4">
+          <button type="button" onClick={onCancel} className="text-sm font-medium text-[#2563EB] hover:opacity-70 px-2 py-1">
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(scope)}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-semibold px-5 py-2 rounded-full transition"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -65,7 +65,15 @@ export interface Lesson {
    * Checking it also marks the lesson paid (it's covered by the
    * subscription), so it doesn't separately show up as debt. */
   subscriptionDeducted?: boolean;
+  /** Shared by every occurrence created together from one recurring-lesson
+   * form submission — absent on a one-off lesson. Lets deleting a single
+   * occurrence offer "this one / this and following / all" like a calendar
+   * app, instead of only ever deleting the one lesson in front of you. */
+  seriesId?: string;
 }
+
+/** Which occurrences of a recurring lesson series a delete applies to. */
+export type LessonDeleteScope = "this" | "following" | "all";
 
 // assigned: given to the student, not yet turned in.
 // submitted: the student marked it done — awaiting the tutor's review.
