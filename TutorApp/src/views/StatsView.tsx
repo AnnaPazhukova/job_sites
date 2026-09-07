@@ -48,7 +48,7 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
   const scheduledHours = monthLessons.filter((l) => l.date > TODAY_KEY).reduce((s, l) => s + (Number(l.duration) || 0), 0) / 60;
 
   const pendingHomework = homework.filter((h) => h.status !== "done").length;
-  const missed = activeLessons.filter((l) => paymentStateOf(l) !== "paid" && l.date < TODAY_KEY).length;
+  const missed = activeLessons.filter((l) => paymentStateOf(l) !== "paid" && isLessonPast(l)).length;
 
   return (
     <div>
