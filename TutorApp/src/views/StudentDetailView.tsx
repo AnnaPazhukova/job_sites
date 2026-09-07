@@ -418,7 +418,10 @@ export function StudentDetailPage({
                     <span>
                       {student.subscription.total - student.subscription.remaining} из {student.subscription.total} уроков использовано
                     </span>
-                    <span className="text-[#2563EB]">{student.subscription.remaining} осталось</span>
+                    <span className="text-[#2563EB]">
+                      {student.subscription.remaining} осталось
+                      {student.rate ? ` · ${fmtMoney(student.subscription.remaining * student.rate)}` : ""}
+                    </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
                     <div
@@ -693,6 +696,12 @@ export function LessonFormModal({
   const [time, setTime] = useState(lesson?.time || "15:00");
   const [duration, setDuration] = useState(lesson?.duration || defaultDuration || 60);
   const [price, setPrice] = useState(lesson?.price ?? defaultRate ?? 0);
+  // defaultRate is the student's price for a lesson of defaultDuration
+  // minutes (e.g. 1500₽ for 60 min) — until the tutor types a price
+  // themselves, changing the duration (e.g. to book a one-off 2-hour
+  // lesson) scales that rate proportionally instead of silently keeping
+  // the 1-hour price for a 2-hour lesson.
+  const [priceTouched, setPriceTouched] = useState(false);
   const [paidAmount, setPaidAmount] = useState(lesson ? paidAmountOf(lesson) : 0);
   // Whether the partial-amount input is open — tracked separately from the
   // derived paid/partial/pending label so the input doesn't vanish mid-edit
@@ -720,7 +729,10 @@ export function LessonFormModal({
   const isPast = isEdit && isLessonPast(lesson!);
   const isCancelled = lesson?.status === "cancelled";
   const priceNum = Number(price) || 0;
-  const paymentState: "paid" | "partial" | "pending" = priceNum > 0 && paidAmount >= priceNum ? "paid" : paidAmount > 0 ? "partial" : "pending";
+  // A free lesson (priceNum <= 0) has nothing left to pay, so it's trivially
+  // "paid" — matching paymentStateOf() in lib/utils.ts, which this duplicates
+  // for the in-progress (not-yet-saved) price/paidAmount in this form.
+  const paymentState: "paid" | "partial" | "pending" = priceNum <= 0 || paidAmount >= priceNum ? "paid" : paidAmount > 0 ? "partial" : "pending";
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
@@ -941,10 +953,26 @@ export function LessonFormModal({
             )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Длительность, мин">
-                <TextInput type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+                <TextInput
+                  type="number"
+                  value={duration}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setDuration(next);
+                    if (!priceTouched && defaultDuration > 0) setPrice(Math.round((defaultRate * next) / defaultDuration));
+                  }}
+                />
               </Field>
               <Field label="Стоимость, ₽">
-                <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+                <TextInput
+                  icon={Wallet}
+                  type="number"
+                  value={price}
+                  onChange={(e) => {
+                    setPrice(Number(e.target.value));
+                    setPriceTouched(true);
+                  }}
+                />
               </Field>
             </div>
           </>

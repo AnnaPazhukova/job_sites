@@ -240,6 +240,7 @@ function PaymentSummary({ profile, lessons }: { profile: Student; lessons: Lesso
           </div>
           <span className="text-xs text-gray-500 shrink-0">
             {sub.total - sub.remaining} из {sub.total}
+            {profile.rate ? ` · осталось ${fmtMoney(sub.remaining * profile.rate)}` : ""}
           </span>
         </div>
       ) : (

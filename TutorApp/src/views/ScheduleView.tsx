@@ -477,6 +477,11 @@ function AddLessonModal({
   const [time, setTime] = useState("15:00");
   const [duration, setDuration] = useState(options[0]?.duration || 60);
   const [price, setPrice] = useState(options[0]?.rate || 0);
+  // Until the tutor types a price themselves, changing duration away from
+  // the student's usual length (e.g. picking 120 for a one-off double
+  // lesson) scales their normal rate proportionally instead of silently
+  // keeping the price for their usual, shorter duration.
+  const [priceTouched, setPriceTouched] = useState(false);
   const [dateStr, setDateStr] = useState(dateKey(date || new Date()));
   const [recurring, setRecurring] = useState(false);
   const [freq, setFreq] = useState<RecurrenceFreq>("weekly");
@@ -495,6 +500,7 @@ function AddLessonModal({
     if (opt) {
       setDuration(opt.duration);
       setPrice(opt.rate);
+      setPriceTouched(false);
     }
   }
 
@@ -537,7 +543,18 @@ function AddLessonModal({
           <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </Field>
         <Field label="Длительность, мин">
-          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm">
+          <select
+            value={duration}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setDuration(next);
+              if (!priceTouched) {
+                const opt = options.find((o) => o.id === who);
+                if (opt && opt.duration > 0) setPrice(Math.round((opt.rate * next) / opt.duration));
+              }
+            }}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
+          >
             {[30, 45, 60, 90, 120].map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -546,7 +563,15 @@ function AddLessonModal({
           </select>
         </Field>
         <Field label="Стоимость, ₽">
-          <TextInput icon={Wallet} type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+          <TextInput
+            icon={Wallet}
+            type="number"
+            value={price}
+            onChange={(e) => {
+              setPrice(Number(e.target.value));
+              setPriceTouched(true);
+            }}
+          />
         </Field>
         <RecurrenceFields
           recurring={recurring}
