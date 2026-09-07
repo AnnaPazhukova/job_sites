@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { setPersistErrorHandler, useStore } from "./lib/storage";
 import { StaleWriteError } from "./lib/supabaseStorage";
-import { isLessonPast } from "./lib/utils";
+import { isLessonPast, paymentStateOf } from "./lib/utils";
 import { SEED_NOTES_DATA, SEED_TASKS_DATA } from "./data/seedContent";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
 
@@ -116,7 +116,10 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   }, [seedFlagsLoaded]);
 
   const pendingHw = homework.filter((h) => h.status === "submitted").length;
-  const dueUnpaid = lessons.filter((l) => l.status !== "cancelled" && l.paymentStatus !== "paid" && isLessonPast(l)).length;
+  // paymentStateOf (not the raw paymentStatus flag) so a free lesson —
+  // always "paid" since there's nothing to pay — doesn't get counted here
+  // as still awaiting payment.
+  const dueUnpaid = lessons.filter((l) => l.status !== "cancelled" && paymentStateOf(l) !== "paid" && isLessonPast(l)).length;
 
   function handleBellClick() {
     const total = pendingHw + dueUnpaid;

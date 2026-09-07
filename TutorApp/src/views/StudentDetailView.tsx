@@ -188,11 +188,15 @@ export function StudentDetailPage({
   const studentLessons = lessons
     .filter((l) => l.studentId === student.id)
     .sort((a, b) => b.date.localeCompare(a.date) || b.time?.localeCompare(a.time));
-  const paidLessons = studentLessons.filter((l) => paymentStateOf(l) === "paid");
+  // A cancelled lesson isn't billed (see studentBalance() in StudentsView) —
+  // excluded here too, so "оплачено"/"руб. всего" below can't count more
+  // than "всего занятий" if one happened to be paid before being cancelled.
+  const activeStudentLessons = studentLessons.filter((l) => l.status !== "cancelled");
+  const paidLessons = activeStudentLessons.filter((l) => paymentStateOf(l) === "paid");
   const studentHomework = sortHomeworkNewestFirst(homework.filter((h) => h.studentId === student.id));
   const currentMonthPrefix = TODAY_KEY.slice(0, 7);
-  const monthLessons = studentLessons.filter((l) => l.status !== "cancelled" && l.date.slice(0, 7) === currentMonthPrefix).length;
-  const totalEarned = studentLessons.reduce((s, l) => s + paidAmountOf(l), 0);
+  const monthLessons = activeStudentLessons.filter((l) => l.date.slice(0, 7) === currentMonthPrefix).length;
+  const totalEarned = activeStudentLessons.reduce((s, l) => s + paidAmountOf(l), 0);
 
   function saveLesson(data: Partial<Lesson> & { occurrences?: string[] }) {
     if (data.id) {
@@ -480,7 +484,7 @@ export function StudentDetailPage({
 
         <div className="font-bold text-xl mt-6 mb-4">Статистика</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StudentStatBox color="blue" value={studentLessons.filter((l) => l.status !== "cancelled").length} label="всего занятий" />
+          <StudentStatBox color="blue" value={activeStudentLessons.length} label="всего занятий" />
           <StudentStatBox color="green" value={paidLessons.length} label="оплачено" />
           <StudentStatBox color="purple" value={monthLessons} label="в месяц" />
           <StudentStatBox color="orange" value={totalEarned} label="руб. всего" />
