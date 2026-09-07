@@ -222,6 +222,35 @@ export function syncHomeworkAttachmentsToNote(homework: Homework, notes: MethodN
   saveNotes(notes.map((n) => (n.id === note.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
 }
 
+// Topics for one grade+subject, in the order they're stored — NotesView
+// never resorts them client-side, so storage order *is* topic order (e.g.
+// "1. ...", "2. ..."), and this relies on that same convention.
+export function topicsForSubject(notes: MethodNote[], grade: string | undefined, subject: string): MethodNote[] {
+  return notes.filter((n) => n.grade === grade && n.subject === subject);
+}
+
+// Advances a student's topic cycle by one turn — used once per lesson being
+// created, in date order. Returns the topic to assign to that lesson (the
+// subject whose turn it is, at wherever that subject's list had gotten to)
+// and the updated cycle to persist for next time. Wraps back to the first
+// topic once a subject's list is exhausted, rather than assigning nothing.
+export function advanceTopicCycle(
+  cycle: NonNullable<Student["topicCycle"]>,
+  notes: MethodNote[],
+  grade: string | undefined
+): { noteId: string | undefined; cycle: NonNullable<Student["topicCycle"]> } {
+  if (cycle.subjects.length === 0) return { noteId: undefined, cycle };
+  const subject = cycle.subjects[cycle.nextIndex % cycle.subjects.length];
+  const topics = topicsForSubject(notes, grade, subject);
+  const noteId = cycle.cursors[subject];
+  const idx = noteId ? topics.findIndex((t) => t.id === noteId) : -1;
+  const nextId = topics.length ? topics[(idx + 1) % topics.length]?.id : undefined;
+  return {
+    noteId,
+    cycle: { ...cycle, nextIndex: (cycle.nextIndex + 1) % cycle.subjects.length, cursors: { ...cycle.cursors, [subject]: nextId } },
+  };
+}
+
 // Homework is created from two different places (this file's own
 // buildHomeworkAssignment and HomeworkView's standalone "Задать ДЗ") that
 // don't agree on whether new items get appended or prepended to the stored

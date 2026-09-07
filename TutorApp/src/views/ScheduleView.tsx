@@ -3,6 +3,7 @@ import { AlertTriangle, Calendar as CalendarIcon, CalendarPlus, CalendarCheck2, 
 import { Avatar, Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
   adjacentLessons,
+  advanceTopicCycle,
   buildHomeworkAssignment,
   buildRecurringDates,
   dateKey,
@@ -134,15 +135,32 @@ export function ScheduleView({
     const { occurrences, ...base } = data;
     const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
     const seriesId = dates.length > 1 ? uid() : undefined;
-    const created: Lesson[] = dates.map((date) => ({
-      ...(base as Omit<Lesson, "id" | "date" | "status" | "paymentStatus">),
-      id: uid(),
-      date,
-      status: "scheduled",
-      paymentStatus: "pending",
-      seriesId,
-    }));
+    // This modal has no topic picker of its own, so a configured topic
+    // cycle (set up on the student's own page) fills noteId in for every
+    // occurrence here, in date order — see advanceTopicCycle.
+    const targetStudent = students.find((s) => s.id === base.studentId);
+    let cycle = targetStudent?.topicCycle;
+    const created: Lesson[] = dates.map((date) => {
+      let noteId: string | undefined;
+      if (cycle) {
+        const advanced = advanceTopicCycle(cycle, notes, targetStudent?.grade);
+        noteId = advanced.noteId;
+        cycle = advanced.cycle;
+      }
+      return {
+        ...(base as Omit<Lesson, "id" | "date" | "status" | "paymentStatus">),
+        id: uid(),
+        date,
+        status: "scheduled",
+        paymentStatus: "pending",
+        seriesId,
+        noteId,
+      };
+    });
     setLessons([...lessons, ...created]);
+    if (cycle && targetStudent && cycle !== targetStudent.topicCycle) {
+      setStudents(students.map((s) => (s.id === targetStudent.id ? { ...s, topicCycle: cycle } : s)));
+    }
     setShowAdd(false);
     showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено в расписание");
   }
