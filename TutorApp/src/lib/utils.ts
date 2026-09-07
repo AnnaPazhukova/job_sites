@@ -136,14 +136,15 @@ export function remainingAmountOf(l: PayableLesson): number {
   return Math.max(0, (Number(l.price) || 0) - paidAmountOf(l));
 }
 
-export type PaymentState = "paid" | "partial" | "pending";
+export type PaymentState = "paid" | "pending";
 
+// Payment is strictly all-or-nothing — a lesson paid for only in part (from
+// before this was removed as an option) still counts as unpaid here, same as
+// one never paid at all; what's actually been paid toward it stays visible
+// via paidAmountOf/remainingAmountOf for balance totals.
 export function paymentStateOf(l: PayableLesson): PaymentState {
   const price = Number(l.price) || 0;
-  const paid = paidAmountOf(l);
-  if (price <= 0 || paid >= price) return "paid";
-  if (paid <= 0) return "pending";
-  return "partial";
+  return price <= 0 || paidAmountOf(l) >= price ? "paid" : "pending";
 }
 
 // Adjacent lessons for the same student, in chronological order — powers

@@ -557,22 +557,15 @@ export function StudentDetailPage({
                     >
                       <Clock size={13} /> {l.status === "cancelled" ? "Отменено" : held ? "Проведено" : "Запланировано"}
                     </span>
-                    {l.status !== "cancelled" && (() => {
-                      const state = paymentStateOf(l);
-                      return (
-                        <span
-                          className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
-                          ${state === "paid" ? "bg-emerald-50 text-emerald-600" : state === "partial" ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-500"}`}
-                        >
-                          <Wallet size={13} />
-                          {state === "paid"
-                            ? "Оплачено"
-                            : state === "partial"
-                            ? `Частично: ${fmtMoney(paidAmountOf(l))} из ${fmtMoney(l.price)}`
-                            : "Ожидает оплаты"}
-                        </span>
-                      );
-                    })()}
+                    {l.status !== "cancelled" && (
+                      <span
+                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0
+                        ${paymentStateOf(l) === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}
+                      >
+                        <Wallet size={13} />
+                        {paymentStateOf(l) === "paid" ? "Оплачено" : "Ожидает оплаты"}
+                      </span>
+                    )}
                     <button
                       onClick={() => (l.status === "cancelled" ? null : cancelLesson(l.id))}
                       disabled={l.status === "cancelled"}
@@ -746,11 +739,6 @@ export function LessonFormModal({
   // the 1-hour price for a 2-hour lesson.
   const [priceTouched, setPriceTouched] = useState(false);
   const [paidAmount, setPaidAmount] = useState(lesson ? paidAmountOf(lesson) : 0);
-  // Whether the partial-amount input is open — tracked separately from the
-  // derived paid/partial/pending label so the input doesn't vanish mid-edit
-  // just because the in-progress value happens to pass through 0 or the
-  // full price while the tutor is typing.
-  const [amountMode, setAmountMode] = useState(lesson ? paymentStateOf(lesson) === "partial" : false);
   const [deductSubscription, setDeductSubscription] = useState(lesson?.subscriptionDeducted ?? false);
   const [comment, setComment] = useState(lesson?.comment || "");
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
@@ -776,7 +764,7 @@ export function LessonFormModal({
   // A free lesson (priceNum <= 0) has nothing left to pay, so it's trivially
   // "paid" — matching paymentStateOf() in lib/utils.ts, which this duplicates
   // for the in-progress (not-yet-saved) price/paidAmount in this form.
-  const paymentState: "paid" | "partial" | "pending" = priceNum <= 0 || paidAmount >= priceNum ? "paid" : paidAmount > 0 ? "partial" : "pending";
+  const paymentState: "paid" | "pending" = priceNum <= 0 || paidAmount >= priceNum ? "paid" : "pending";
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
@@ -797,7 +785,6 @@ export function LessonFormModal({
   function toggleDeductSubscription() {
     const next = !deductSubscription;
     setDeductSubscription(next);
-    setAmountMode(false);
     setPaidAmount(next ? priceNum : 0);
   }
 
@@ -896,19 +883,11 @@ export function LessonFormModal({
       {isEdit && (
         <div className="flex items-center gap-2 mb-5 flex-wrap">
           {isPast ? (
-            <>
-              {isCancelled && (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-400">
-                  <Clock size={15} /> Отменено
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600">
-                <User size={15} /> {studentName}
+            isCancelled && (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-400">
+                <Clock size={15} /> Отменено
               </span>
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl bg-gray-100 text-gray-600">
-                <Clock size={15} /> {time} · {duration} мин · {price} ₽
-              </span>
-            </>
+            )
           ) : (
             <span
               className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl ${
@@ -920,62 +899,23 @@ export function LessonFormModal({
           )}
           {/* A cancelled lesson isn't billed, so payment status doesn't apply — see studentBalance() in StudentsView. */}
           {!isCancelled && (
-            <div
-              className={`inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-xl border transition
-                ${
-                  paymentState === "paid"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                    : paymentState === "partial"
-                    ? "bg-amber-50 border-amber-200 text-amber-700"
-                    : "bg-blue-50 border-blue-200 text-[#2563EB]"
-                }`}
+            <button
+              type="button"
+              onClick={() => {
+                const turningOff = paymentState === "paid";
+                // Marking it unpaid by hand while it's flagged as deducted
+                // from the subscription would leave the two controls
+                // disagreeing — clear the flag too.
+                if (turningOff) setDeductSubscription(false);
+                setPaidAmount(turningOff ? 0 : priceNum);
+              }}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl border transition hover:opacity-80
+                ${paymentState === "paid" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-blue-50 border-blue-200 text-[#2563EB]"}`}
+              title={paymentState === "paid" ? "Отметить неоплаченным" : "Отметить оплаченным"}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setAmountMode(false);
-                  setPaidAmount((a) => {
-                    const turningOff = a >= priceNum;
-                    // Marking it unpaid by hand while it's flagged as
-                    // deducted from the subscription would leave the two
-                    // controls disagreeing — clear the flag too.
-                    if (turningOff) setDeductSubscription(false);
-                    return turningOff ? 0 : priceNum;
-                  });
-                }}
-                className="inline-flex items-center gap-1.5 hover:opacity-70 transition"
-                title={paymentState === "paid" ? "Отметить неоплаченным" : "Отметить оплаченным полностью"}
-              >
-                {paymentState === "paid" ? <Check size={15} /> : <Wallet size={15} />}
-                {paymentState === "paid" ? "Оплачено" : paymentState === "partial" ? "Оплачено частично" : "Отметить оплату"}
-              </button>
-              {amountMode ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-px h-4 bg-current opacity-20" />
-                  <input
-                    type="number"
-                    min={0}
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(Math.max(0, Number(e.target.value)))}
-                    autoFocus
-                    className="w-14 bg-transparent border-0 border-b border-current text-right font-semibold focus:outline-none"
-                  />
-                  <span className="opacity-70">из {priceNum} ₽</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAmountMode(true);
-                    if (paidAmount <= 0 || paidAmount >= priceNum) setPaidAmount(Math.max(1, Math.round(priceNum / 2)));
-                  }}
-                  className="text-xs underline decoration-dotted opacity-70 hover:opacity-100 transition"
-                  title="Указать сумму частичной оплаты"
-                >
-                  частично…
-                </button>
-              )}
-            </div>
+              {paymentState === "paid" ? <Check size={15} /> : <Wallet size={15} />}
+              {paymentState === "paid" ? "Оплачено" : "Отметить оплату"}
+            </button>
           )}
           {/* Deducting from the subscription is a separate, manual choice from
               marking payment above — not every lesson for a subscribed
@@ -1024,53 +964,53 @@ export function LessonFormModal({
       )}
 
       <form onSubmit={submit} className="space-y-4">
-        {!isPast && (
-          <>
-            <Field label="Ученик">
-              <TextInput icon={User} value={studentName} readOnly />
-            </Field>
+        <Field label="Ученик">
+          <TextInput icon={User} value={studentName} readOnly />
+        </Field>
 
-            <Field label="Дата">
-              <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </Field>
-            <Field label="Время">
-              <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            </Field>
-            {isEdit && onMoveLesson && (
-              <button
-                type="button"
-                onClick={() => onMoveLesson(date, time)}
-                className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium text-[#2563EB] bg-blue-50 hover:bg-blue-100 px-3.5 py-2.5 rounded-xl transition"
-              >
-                <CalendarClock size={15} /> Перенести урок на эти дату и время
-              </button>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Длительность, мин">
-                <TextInput
-                  type="number"
-                  value={duration}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setDuration(next);
-                    if (!priceTouched && defaultDuration > 0) setPrice(Math.round((defaultRate * next) / defaultDuration));
-                  }}
-                />
-              </Field>
-              <Field label="Стоимость, ₽">
-                <TextInput
-                  icon={Wallet}
-                  type="number"
-                  value={price}
-                  onChange={(e) => {
-                    setPrice(Number(e.target.value));
-                    setPriceTouched(true);
-                  }}
-                />
-              </Field>
-            </div>
-          </>
+        <Field label="Дата">
+          <TextInput icon={CalendarIcon} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Время">
+          <TextInput icon={Clock} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </Field>
+        {/* A quick one-click reschedule, redundant with just editing the date/time
+            fields above and saving — kept only for an upcoming lesson, where
+            "move it" is the common case; a past lesson is edited via Save like
+            everything else about it. */}
+        {!isPast && isEdit && onMoveLesson && (
+          <button
+            type="button"
+            onClick={() => onMoveLesson(date, time)}
+            className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium text-[#2563EB] bg-blue-50 hover:bg-blue-100 px-3.5 py-2.5 rounded-xl transition"
+          >
+            <CalendarClock size={15} /> Перенести урок на эти дату и время
+          </button>
         )}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Длительность, мин">
+            <TextInput
+              type="number"
+              value={duration}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setDuration(next);
+                if (!priceTouched && defaultDuration > 0) setPrice(Math.round((defaultRate * next) / defaultDuration));
+              }}
+            />
+          </Field>
+          <Field label="Стоимость, ₽">
+            <TextInput
+              icon={Wallet}
+              type="number"
+              value={price}
+              onChange={(e) => {
+                setPrice(Number(e.target.value));
+                setPriceTouched(true);
+              }}
+            />
+          </Field>
+        </div>
 
         {isEdit && (
           <>
