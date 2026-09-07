@@ -22,6 +22,17 @@ export interface Student {
   grade?: string;
   school?: string;
   goal?: string;
+  /** Automatic methodology-topic assignment for this student's lessons —
+   * `subjects` is the rotation order (a single subject to always use it, or
+   * several to alternate: e.g. Algebra/Geometry every other lesson);
+   * `cursors` holds, per subject, the next topic (MethodNote id) to hand out
+   * — it advances every time that subject's turn comes up. See
+   * advanceTopicCycle in lib/utils.ts. */
+  topicCycle?: {
+    subjects: string[];
+    nextIndex: number;
+    cursors: Record<string, string | undefined>;
+  };
 }
 
 export interface Group {

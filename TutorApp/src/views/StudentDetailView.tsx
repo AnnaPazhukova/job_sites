@@ -29,6 +29,7 @@ import { Card, DurationPicker, EmptyState, Field, GhostButton, MethodNotePicker,
 import { AttachmentsField } from "../components/Attachments";
 import {
   adjacentLessons,
+  advanceTopicCycle,
   buildHomeworkAssignment,
   buildRecurringDates,
   fmtDateRu,
@@ -42,6 +43,7 @@ import {
   SUBSCRIPTION_SIZES,
   syncHomeworkAttachmentsToNote,
   TODAY_KEY,
+  topicsForSubject,
   uid,
   type RecurrenceEnd,
   type RecurrenceFreq,
@@ -220,21 +222,65 @@ export function StudentDetailPage({
       const { occurrences, ...base } = data;
       const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
       const seriesId = dates.length > 1 ? uid() : undefined;
-      const created: Lesson[] = dates.map((date) => ({
-        ...(base as Omit<Lesson, "id" | "date" | "studentId" | "title" | "status" | "paymentStatus">),
-        id: uid(),
-        date,
-        studentId: student!.id,
-        title: student!.name,
-        status: "scheduled",
-        paymentStatus: "pending",
-        seriesId,
-      }));
+      // New lessons don't expose a topic picker of their own (see
+      // LessonFormModal — "Урок из методики" only shows once isEdit), so a
+      // configured topic cycle (see applyTopicCycleConfig) fills noteId in
+      // for every occurrence here, in date order.
+      let cycle = student!.topicCycle;
+      const created: Lesson[] = dates.map((date) => {
+        let noteId: string | undefined;
+        if (cycle) {
+          const advanced = advanceTopicCycle(cycle, notes, student!.grade);
+          noteId = advanced.noteId;
+          cycle = advanced.cycle;
+        }
+        return {
+          ...(base as Omit<Lesson, "id" | "date" | "studentId" | "title" | "status" | "paymentStatus">),
+          id: uid(),
+          date,
+          studentId: student!.id,
+          title: student!.name,
+          status: "scheduled",
+          paymentStatus: "pending",
+          seriesId,
+          noteId,
+        };
+      });
       setLessons([...lessons, ...created]);
+      if (cycle && cycle !== student!.topicCycle) save({ topicCycle: cycle });
       showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено");
     }
     setShowLessonForm(false);
     setEditLesson(null);
+  }
+
+  // Resets the student's topic rotation to start from the chosen topics, and
+  // immediately re-lays it over every upcoming (not yet happened, not
+  // cancelled) lesson in date order — including ones that already had a
+  // topic, since configuring this is meant as a fresh start for what's ahead.
+  function applyTopicCycleConfig(rows: { subject: string; startId: string }[]) {
+    let cycle: NonNullable<Student["topicCycle"]> = {
+      subjects: rows.map((r) => r.subject),
+      nextIndex: 0,
+      cursors: Object.fromEntries(rows.map((r) => [r.subject, r.startId])),
+    };
+    const upcoming = lessons
+      .filter((l) => l.studentId === student!.id && l.status !== "cancelled" && !isLessonPast(l))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    const nextNoteIds = new Map<string, string | undefined>();
+    for (const lesson of upcoming) {
+      const advanced = advanceTopicCycle(cycle, notes, student!.grade);
+      nextNoteIds.set(lesson.id, advanced.noteId);
+      cycle = advanced.cycle;
+    }
+    setLessons(lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
+    save({ topicCycle: cycle });
+    showToast(upcoming.length > 0 ? `Темы расставлены: ${upcoming.length} занятий` : "Темы будут расставляться для новых занятий");
+  }
+
+  function disableTopicCycle() {
+    save({ topicCycle: undefined });
+    showToast("Автоматические темы отключены");
   }
 
   function cancelLesson(id: string) {
@@ -506,6 +552,10 @@ export function StudentDetailPage({
                 </div>
               )}
             </div>
+            <div>
+              <div className="text-sm font-medium text-gray-700 mb-2">Порядок тем</div>
+              <TopicCycleEditor student={student} notes={notes} onApply={applyTopicCycleConfig} onDisable={disableTopicCycle} />
+            </div>
           </div>
         </div>
 
@@ -668,6 +718,150 @@ function StudentStatBox({ color, value, label }: { color: string; value: number;
         {value}
       </div>
       <div className="text-sm text-gray-500 mt-1">{label}</div>
+    </div>
+  );
+}
+
+// Lets the tutor set up automatic methodology-topic assignment for a
+// student's upcoming lessons: one subject to always use it, or several to
+// alternate turn by turn (e.g. Algebra/Geometry every other lesson). Picking
+// a starting topic per subject and applying re-lays the whole rotation over
+// the student's upcoming lessons — see applyTopicCycleConfig.
+function TopicCycleEditor({
+  student,
+  notes,
+  onApply,
+  onDisable,
+}: {
+  student: Student;
+  notes: MethodNote[];
+  onApply: (rows: { subject: string; startId: string }[]) => void;
+  onDisable: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [rows, setRows] = useState<{ subject: string; startId: string }[]>(
+    student.topicCycle && student.topicCycle.subjects.length > 0
+      ? student.topicCycle.subjects.map((s) => ({ subject: s, startId: student.topicCycle!.cursors[s] || "" }))
+      : [{ subject: "", startId: "" }]
+  );
+
+  if (!student.grade) {
+    return <div className="text-xs text-gray-400">Сначала укажите класс ученика — темы берутся из методики для этого класса.</div>;
+  }
+
+  const subjectsForGrade = Array.from(new Set(notes.filter((n) => n.grade === student.grade).map((n) => n.subject)));
+
+  if (subjectsForGrade.length === 0) {
+    return <div className="text-xs text-gray-400">В методике пока нет тем для класса «{student.grade}».</div>;
+  }
+
+  function startEditing() {
+    setRows(
+      student.topicCycle && student.topicCycle.subjects.length > 0
+        ? student.topicCycle.subjects.map((s) => ({ subject: s, startId: student.topicCycle!.cursors[s] || "" }))
+        : [{ subject: "", startId: "" }]
+    );
+    setEditing(true);
+  }
+
+  if (!editing && !student.topicCycle) {
+    return (
+      <button type="button" onClick={startEditing} className="text-sm font-medium text-[#2563EB] hover:opacity-70 transition">
+        + Настроить автоматические темы
+      </button>
+    );
+  }
+
+  if (!editing && student.topicCycle) {
+    return (
+      <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-2">
+        {student.topicCycle.subjects.map((subject, i) => {
+          const nextTopic = topicsForSubject(notes, student.grade, subject).find((t) => t.id === student.topicCycle!.cursors[subject]);
+          return (
+            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium shrink-0">{subject}</span>
+              <span className="text-gray-500 truncate">{nextTopic ? nextTopic.topic : "темы закончились"}</span>
+            </div>
+          );
+        })}
+        <div className="flex items-center gap-3 pt-1">
+          <GhostButton full onClick={startEditing}>
+            Изменить
+          </GhostButton>
+          <button type="button" onClick={onDisable} className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 shrink-0">
+            Отключить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3 space-y-3">
+      <div className="text-xs text-gray-500">
+        Занятия по очереди получают тему из выбранных предметов — один предмет для всех занятий, или несколько по очереди (например, алгебра и геометрия через раз).
+      </div>
+      {rows.map((row, i) => {
+        const topics = topicsForSubject(notes, student.grade, row.subject);
+        return (
+          <div key={i} className="flex items-center gap-2">
+            <select
+              value={row.subject}
+              onChange={(e) => setRows(rows.map((r, ri) => (ri === i ? { subject: e.target.value, startId: "" } : r)))}
+              className="w-2/5 shrink-0 px-2.5 py-2 rounded-lg bg-white border border-[#E7E9EE] text-sm"
+            >
+              <option value="">Предмет…</option>
+              {subjectsForGrade.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <select
+              value={row.startId}
+              onChange={(e) => setRows(rows.map((r, ri) => (ri === i ? { ...r, startId: e.target.value } : r)))}
+              disabled={!row.subject}
+              className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-white border border-[#E7E9EE] text-sm disabled:opacity-50"
+            >
+              <option value="">Начальная тема…</option>
+              {topics.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.topic}
+                </option>
+              ))}
+            </select>
+            {rows.length > 1 && (
+              <button type="button" onClick={() => setRows(rows.filter((_, ri) => ri !== i))} className="p-1.5 text-gray-400 hover:text-red-500 shrink-0">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {rows.length < 3 && (
+        <button
+          type="button"
+          onClick={() => setRows([...rows, { subject: "", startId: "" }])}
+          className="text-xs font-medium text-[#2563EB] hover:opacity-70 transition"
+        >
+          + Добавить предмет
+        </button>
+      )}
+      <div className="flex items-center gap-2 pt-1">
+        <GhostButton full onClick={() => setEditing(false)}>
+          Отмена
+        </GhostButton>
+        <PrimaryButton
+          full
+          disabled={rows.some((r) => !r.subject || !r.startId)}
+          onClick={() => {
+            onApply(rows);
+            setEditing(false);
+          }}
+        >
+          Применить
+        </PrimaryButton>
+      </div>
     </div>
   );
 }
