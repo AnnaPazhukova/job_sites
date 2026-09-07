@@ -58,6 +58,13 @@ export interface Lesson {
   attachments?: Attachment[];
   /** Student asked to cancel this lesson from their portal — awaiting the tutor's approve/decline. */
   cancelRequested?: boolean;
+  /** Whether this lesson has been deducted from the student's subscription
+   * (see Student.subscription) — the tutor marks this per lesson rather
+   * than it happening automatically, since not every lesson for a
+   * subscribed student is necessarily meant to draw from the package.
+   * Checking it also marks the lesson paid (it's covered by the
+   * subscription), so it doesn't separately show up as debt. */
+  subscriptionDeducted?: boolean;
 }
 
 // assigned: given to the student, not yet turned in.

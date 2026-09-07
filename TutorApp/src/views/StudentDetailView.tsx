@@ -18,6 +18,7 @@ import {
   School,
   Star,
   Target,
+  Ticket,
   Trash2,
   User,
   Users,
@@ -47,7 +48,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal } from "./HomeworkView";
-import type { Attachment, Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, ViewId } from "../lib/types";
+import type { Attachment, Homework, HomeworkStatus, Lesson, MessagesByStudent, MethodNote, Student, Subscription, ViewId } from "../lib/types";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
 
@@ -198,8 +199,21 @@ export function StudentDetailPage({
   const monthLessons = activeStudentLessons.filter((l) => l.date.slice(0, 7) === currentMonthPrefix).length;
   const totalEarned = activeStudentLessons.reduce((s, l) => s + paidAmountOf(l), 0);
 
+  // +1 gives a lesson slot back to the subscription (undoing a deduction),
+  // -1 consumes one — clamped so it can't go below 0 or above the package
+  // total.
+  function applySubscriptionDelta(delta: number) {
+    const sub = student!.subscription;
+    if (!sub || delta === 0) return;
+    save({ subscription: { ...sub, remaining: Math.max(0, Math.min(sub.total, sub.remaining + delta)) } });
+  }
+
   function saveLesson(data: Partial<Lesson> & { occurrences?: string[] }) {
     if (data.id) {
+      const wasDeducted = lessons.find((l) => l.id === data.id)?.subscriptionDeducted ?? false;
+      if (data.subscriptionDeducted !== undefined && data.subscriptionDeducted !== wasDeducted) {
+        applySubscriptionDelta(wasDeducted ? 1 : -1);
+      }
       setLessons(lessons.map((l) => (l.id === data.id ? { ...l, ...data } : l)));
       showToast("Занятие обновлено");
     } else {
@@ -222,13 +236,17 @@ export function StudentDetailPage({
   }
 
   function cancelLesson(id: string) {
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)));
+    const lesson = lessons.find((l) => l.id === id);
+    if (lesson?.subscriptionDeducted) applySubscriptionDelta(1);
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled", subscriptionDeducted: false } : l)));
     showToast("Занятие отменено");
     setShowLessonForm(false);
     setEditLesson(null);
   }
 
   function deleteLesson(id: string) {
+    const lesson = lessons.find((l) => l.id === id);
+    if (lesson?.subscriptionDeducted) applySubscriptionDelta(1);
     setLessons(lessons.filter((l) => l.id !== id));
     showToast("Занятие удалено");
     setShowLessonForm(false);
@@ -606,6 +624,7 @@ export function StudentDetailPage({
               studentGrade={student.grade}
               defaultRate={student.rate || 0}
               defaultDuration={student.duration || 60}
+              subscription={student.subscription}
               previousLesson={prev}
               lesson={editLesson}
               homework={homework}
@@ -655,6 +674,9 @@ interface LessonFormProps {
   studentGrade?: string;
   defaultRate: number;
   defaultDuration: number;
+  /** The student's active subscription, if any — lets the tutor mark this
+   * one lesson as drawn from it (see subscriptionDeducted on Lesson). */
+  subscription?: Subscription | null;
   lesson: Lesson | null;
   /** The student's previous lesson chronologically — its `nextPlan` (set while
    * reviewing it) describes what was intended for *this* lesson, so it's
@@ -681,6 +703,7 @@ export function LessonFormModal({
   studentGrade,
   defaultRate,
   defaultDuration,
+  subscription,
   lesson,
   previousLesson,
   homework = [],
@@ -712,6 +735,7 @@ export function LessonFormModal({
   // just because the in-progress value happens to pass through 0 or the
   // full price while the tutor is typing.
   const [amountMode, setAmountMode] = useState(lesson ? paymentStateOf(lesson) === "partial" : false);
+  const [deductSubscription, setDeductSubscription] = useState(lesson?.subscriptionDeducted ?? false);
   const [comment, setComment] = useState(lesson?.comment || "");
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
   const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
@@ -748,6 +772,19 @@ export function LessonFormModal({
     if (prevPlan) setComment(prevPlan);
   }
 
+  // Checking this marks the lesson as covered by the subscription — which
+  // also means fully paid, so it doesn't separately show up as debt.
+  // Unchecking reverts it to unpaid, since the lesson is then no longer
+  // meant to draw from the package. The actual +/-1 on the subscription's
+  // remaining count happens on save (see saveLesson in StudentDetailPage),
+  // by comparing this against the lesson's previous subscriptionDeducted.
+  function toggleDeductSubscription() {
+    const next = !deductSubscription;
+    setDeductSubscription(next);
+    setAmountMode(false);
+    setPaidAmount(next ? priceNum : 0);
+  }
+
   function toggleDay(d: number) {
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
   }
@@ -775,6 +812,7 @@ export function LessonFormModal({
         price: Number(price),
         paymentStatus: paymentState === "paid" ? "paid" : "pending",
         paidAmount,
+        subscriptionDeducted: deductSubscription,
         comment,
         nextPlan: nextPlan || undefined,
         attachments: lessonAttachments,
@@ -873,7 +911,14 @@ export function LessonFormModal({
                 type="button"
                 onClick={() => {
                   setAmountMode(false);
-                  setPaidAmount((a) => (a >= priceNum ? 0 : priceNum));
+                  setPaidAmount((a) => {
+                    const turningOff = a >= priceNum;
+                    // Marking it unpaid by hand while it's flagged as
+                    // deducted from the subscription would leave the two
+                    // controls disagreeing — clear the flag too.
+                    if (turningOff) setDeductSubscription(false);
+                    return turningOff ? 0 : priceNum;
+                  });
                 }}
                 className="inline-flex items-center gap-1.5 hover:opacity-70 transition"
                 title={paymentState === "paid" ? "Отметить неоплаченным" : "Отметить оплаченным полностью"}
@@ -908,6 +953,28 @@ export function LessonFormModal({
                 </button>
               )}
             </div>
+          )}
+          {/* Deducting from the subscription is a separate, manual choice from
+              marking payment above — not every lesson for a subscribed
+              student necessarily comes out of the package. */}
+          {!isCancelled && subscription && (
+            <button
+              type="button"
+              onClick={toggleDeductSubscription}
+              disabled={!deductSubscription && subscription.remaining <= 0}
+              title={
+                !deductSubscription && subscription.remaining <= 0
+                  ? "В абонементе не осталось занятий"
+                  : deductSubscription
+                  ? "Не списывать с абонемента"
+                  : "Списать это занятие с абонемента"
+              }
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl border transition disabled:opacity-40 disabled:cursor-not-allowed
+                ${deductSubscription ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"}`}
+            >
+              <Ticket size={15} />
+              {deductSubscription ? "Списано с абонемента" : "Списать с абонемента"}
+            </button>
           )}
         </div>
       )}
