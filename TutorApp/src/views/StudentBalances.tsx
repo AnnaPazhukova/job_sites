@@ -75,6 +75,7 @@ export function StudentBalances({ students, setStudents, lessons }: Props) {
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>
                       {student.subscription.total - student.subscription.remaining} из {student.subscription.total} уроков использовано
+                      {student.rate ? ` (осталось ${fmtMoney(student.subscription.remaining * student.rate)})` : ""}
                     </span>
                     <button onClick={() => setSubModalFor(student.id)} className="text-[#2563EB] hover:underline font-medium shrink-0">
                       Обновить
