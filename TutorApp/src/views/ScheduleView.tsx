@@ -145,26 +145,51 @@ export function ScheduleView({
     showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено в расписание");
   }
 
+  // +1 gives a lesson slot back to the subscription (undoing a deduction),
+  // -1 consumes one — clamped so it can't go below 0 or above the package
+  // total.
+  function applySubscriptionDelta(studentId: string | undefined, delta: number) {
+    if (!studentId || delta === 0) return;
+    setStudents(
+      students.map((s) =>
+        s.id === studentId && s.subscription
+          ? { ...s, subscription: { ...s.subscription, remaining: Math.max(0, Math.min(s.subscription.total, s.subscription.remaining + delta)) } }
+          : s
+      )
+    );
+  }
+
   function saveLessonEdit(data: Partial<Lesson>) {
+    const prev = lessons.find((l) => l.id === data.id);
+    const wasDeducted = prev?.subscriptionDeducted ?? false;
+    if (prev && data.subscriptionDeducted !== undefined && data.subscriptionDeducted !== wasDeducted) {
+      applySubscriptionDelta(prev.studentId, wasDeducted ? 1 : -1);
+    }
     setLessons(lessons.map((l) => (l.id === data.id ? { ...l, ...data } : l)));
     showToast("Занятие обновлено");
     setEditLesson(null);
   }
 
   function cancelLessonEdit(id: string) {
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)));
+    const lesson = lessons.find((l) => l.id === id);
+    if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled", subscriptionDeducted: false } : l)));
     showToast("Занятие отменено");
     setEditLesson(null);
   }
 
   function deleteLessonEdit(id: string) {
+    const lesson = lessons.find((l) => l.id === id);
+    if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
     setLessons(lessons.filter((l) => l.id !== id));
     showToast("Занятие удалено");
     setEditLesson(null);
   }
 
   function approveCancelRequest(id: string) {
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false } : l)));
+    const lesson = lessons.find((l) => l.id === id);
+    if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
+    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false, subscriptionDeducted: false } : l)));
     showToast("Занятие отменено");
   }
 
@@ -436,6 +461,7 @@ export function ScheduleView({
               studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
               defaultRate={editLesson.price}
               defaultDuration={editLesson.duration}
+              subscription={students.find((s) => s.id === editLesson.studentId)?.subscription}
               previousLesson={prev}
               lesson={editLesson}
               homework={homework}
