@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { setDataAdapter } from "./lib/storage";
 import { SupabaseAdapter } from "./lib/supabaseStorage";
 import { clearStoredPortalCode, getInviteCodeFromUrl, getStoredPortalCode, storePortalCode } from "./lib/studentAuth";
 import { LoginScreen } from "./LoginScreen";
-import StudentPortal from "./StudentPortal";
-import App from "./App";
+
+// A tutor never needs the student portal bundle and a student never needs
+// the tutor app bundle, so each is only fetched once we know which one this
+// visitor actually is, instead of every visitor downloading both.
+const StudentPortal = lazy(() => import("./StudentPortal"));
+const App = lazy(() => import("./App"));
+
+const LOADING = <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#F7F8FA]">Загрузка…</div>;
 
 type Phase = "loading" | "signed-out" | "tutor";
 
@@ -51,23 +57,29 @@ export default function AuthGate() {
   }, [portalCode]);
 
   if (!supabase) {
-    return <App />;
+    return (
+      <Suspense fallback={LOADING}>
+        <App />
+      </Suspense>
+    );
   }
 
   if (portalCode) {
     return (
-      <StudentPortal
-        code={portalCode}
-        onExit={() => {
-          clearStoredPortalCode();
-          setPortalCode(null);
-        }}
-      />
+      <Suspense fallback={LOADING}>
+        <StudentPortal
+          code={portalCode}
+          onExit={() => {
+            clearStoredPortalCode();
+            setPortalCode(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (phase === "loading") {
-    return <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#F7F8FA]">Загрузка…</div>;
+    return LOADING;
   }
 
   if (phase === "signed-out") {
@@ -75,5 +87,9 @@ export default function AuthGate() {
   }
 
   const client = supabase;
-  return <App userEmail={session?.user.email} onSignOut={() => client.auth.signOut()} />;
+  return (
+    <Suspense fallback={LOADING}>
+      <App userEmail={session?.user.email} onSignOut={() => client.auth.signOut()} />
+    </Suspense>
+  );
 }
