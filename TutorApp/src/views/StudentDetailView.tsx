@@ -254,35 +254,6 @@ export function StudentDetailPage({
     setEditLesson(null);
   }
 
-  // Resets the student's topic rotation to start from the chosen topics, and
-  // immediately re-lays it over every upcoming (not yet happened, not
-  // cancelled) lesson in date order — including ones that already had a
-  // topic, since configuring this is meant as a fresh start for what's ahead.
-  function applyTopicCycleConfig(rows: { subject: string; startId: string }[]) {
-    let cycle: NonNullable<Student["topicCycle"]> = {
-      subjects: rows.map((r) => r.subject),
-      nextIndex: 0,
-      cursors: Object.fromEntries(rows.map((r) => [r.subject, r.startId])),
-    };
-    const upcoming = lessons
-      .filter((l) => l.studentId === student!.id && l.status !== "cancelled" && !isLessonPast(l))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-    const nextNoteIds = new Map<string, string | undefined>();
-    for (const lesson of upcoming) {
-      const advanced = advanceTopicCycle(cycle, notes, student!.grade);
-      nextNoteIds.set(lesson.id, advanced.noteId);
-      cycle = advanced.cycle;
-    }
-    setLessons(lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
-    save({ topicCycle: cycle });
-    showToast(upcoming.length > 0 ? `Темы расставлены: ${upcoming.length} занятий` : "Темы будут расставляться для новых занятий");
-  }
-
-  function disableTopicCycle() {
-    save({ topicCycle: undefined });
-    showToast("Автоматические темы отключены");
-  }
-
   function cancelLesson(id: string) {
     const lesson = lessons.find((l) => l.id === id);
     if (lesson?.subscriptionDeducted) applySubscriptionDelta(1);
@@ -552,10 +523,6 @@ export function StudentDetailPage({
                 </div>
               )}
             </div>
-            <div>
-              <div className="text-sm font-medium text-gray-700 mb-2">Порядок тем</div>
-              <TopicCycleEditor student={student} notes={notes} onApply={applyTopicCycleConfig} onDisable={disableTopicCycle} />
-            </div>
           </div>
         </div>
 
@@ -727,7 +694,7 @@ function StudentStatBox({ color, value, label }: { color: string; value: number;
 // alternate turn by turn (e.g. Algebra/Geometry every other lesson). Picking
 // a starting topic per subject and applying re-lays the whole rotation over
 // the student's upcoming lessons — see applyTopicCycleConfig.
-function TopicCycleEditor({
+export function TopicCycleEditor({
   student,
   notes,
   onApply,
