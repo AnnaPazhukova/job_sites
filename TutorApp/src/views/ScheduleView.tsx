@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Calendar as CalendarIcon, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Plus, Wallet, X } from "lucide-react";
+import { AlertTriangle, Calendar as CalendarIcon, CalendarPlus, CalendarCheck2, Check, ChevronLeft, ChevronRight, Clock, Layers, Plus, Wallet, X } from "lucide-react";
 import { Avatar, Card, Field, Modal, PageHeader, PrimaryButton, RecurrenceFields, TextInput } from "../components/ui";
 import {
   adjacentLessons,
@@ -23,7 +23,7 @@ import type { Attachment, Group, Homework, Lesson, LessonDeleteScope, MessagesBy
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { MiniCalendar } from "../components/MiniCalendar";
-import { LessonFormModal } from "./StudentDetailView";
+import { LessonFormModal, TopicCycleEditor } from "./StudentDetailView";
 import { StudentBalances } from "./StudentBalances";
 import { WeekView, getWeekDays } from "./WeekView";
 
@@ -64,6 +64,7 @@ export function ScheduleView({
   const [addDate, setAddDate] = useState<Date | null>(null);
   const [editLesson, setEditLesson] = useState<Lesson | null>(null);
   const [studentFilter, setStudentFilter] = useState("");
+  const [showTopicCycle, setShowTopicCycle] = useState(false);
 
   const displayedLessons = studentFilter ? lessons.filter((l) => l.studentId === studentFilter) : lessons;
 
@@ -163,6 +164,37 @@ export function ScheduleView({
     }
     setShowAdd(false);
     showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено в расписание");
+  }
+
+  // Resets a student's topic rotation to start from the chosen topics, and
+  // immediately re-lays it over every upcoming (not yet happened, not
+  // cancelled) lesson in date order — including ones that already had a
+  // topic, since configuring this is meant as a fresh start for what's ahead.
+  function applyTopicCycleConfig(studentId: string, rows: { subject: string; startId: string }[]) {
+    const targetStudent = students.find((s) => s.id === studentId);
+    if (!targetStudent) return;
+    let cycle: NonNullable<Student["topicCycle"]> = {
+      subjects: rows.map((r) => r.subject),
+      nextIndex: 0,
+      cursors: Object.fromEntries(rows.map((r) => [r.subject, r.startId])),
+    };
+    const upcoming = lessons
+      .filter((l) => l.studentId === studentId && l.status !== "cancelled" && !isLessonPast(l))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    const nextNoteIds = new Map<string, string | undefined>();
+    for (const lesson of upcoming) {
+      const advanced = advanceTopicCycle(cycle, notes, targetStudent.grade);
+      nextNoteIds.set(lesson.id, advanced.noteId);
+      cycle = advanced.cycle;
+    }
+    setLessons(lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
+    setStudents(students.map((s) => (s.id === studentId ? { ...s, topicCycle: cycle } : s)));
+    showToast(upcoming.length > 0 ? `Темы расставлены: ${upcoming.length} занятий` : "Темы будут расставляться для новых занятий");
+  }
+
+  function disableTopicCycle(studentId: string) {
+    setStudents(students.map((s) => (s.id === studentId ? { ...s, topicCycle: undefined } : s)));
+    showToast("Автоматические темы отключены");
   }
 
   // +1 gives a lesson slot back to the subscription (undoing a deduction),
@@ -303,6 +335,14 @@ export function ScheduleView({
                   </option>
                 ))}
               </select>
+            )}
+            {students.length > 0 && (
+              <button
+                onClick={() => setShowTopicCycle(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-300 shadow-sm text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition"
+              >
+                <Layers size={15} /> Порядок тем
+              </button>
             )}
             <div className="flex items-center bg-white border border-gray-300 shadow-sm rounded-xl">
               <button onClick={goPrev} className="p-2 hover:bg-gray-50 rounded-l-xl">
@@ -478,6 +518,17 @@ export function ScheduleView({
 
       {showAdd && <AddLessonModal date={addDate} students={students} groups={groups} onClose={() => setShowAdd(false)} onSave={addLesson} />}
 
+      {showTopicCycle && (
+        <TopicCycleModal
+          students={students}
+          notes={notes}
+          initialStudentId={studentFilter || undefined}
+          onClose={() => setShowTopicCycle(false)}
+          onApply={applyTopicCycleConfig}
+          onDisable={disableTopicCycle}
+        />
+      )}
+
       {editLesson &&
         (() => {
           const { prev, next } = adjacentLessons(lessons, editLesson);
@@ -507,6 +558,64 @@ export function ScheduleView({
           );
         })()}
     </div>
+  );
+}
+
+// Lets the tutor configure automatic methodology-topic assignment for a
+// student's upcoming lessons right from the schedule, without visiting their
+// profile page — picks the student, then delegates to the same
+// TopicCycleEditor used on the student's own page (see StudentDetailView).
+function TopicCycleModal({
+  students,
+  notes,
+  initialStudentId,
+  onClose,
+  onApply,
+  onDisable,
+}: {
+  students: Student[];
+  notes: MethodNote[];
+  initialStudentId?: string;
+  onClose: () => void;
+  onApply: (studentId: string, rows: { subject: string; startId: string }[]) => void;
+  onDisable: (studentId: string) => void;
+}) {
+  const [studentId, setStudentId] = useState(initialStudentId || students[0]?.id || "");
+  const student = students.find((s) => s.id === studentId);
+
+  return (
+    <Modal title="Порядок тем" onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Ученик">
+          <select
+            value={studentId}
+            onChange={(e) => setStudentId(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] text-sm"
+          >
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {student && (
+          <TopicCycleEditor
+            key={student.id}
+            student={student}
+            notes={notes}
+            onApply={(rows) => {
+              onApply(student.id, rows);
+              onClose();
+            }}
+            onDisable={() => {
+              onDisable(student.id);
+              onClose();
+            }}
+          />
+        )}
+      </div>
+    </Modal>
   );
 }
 
