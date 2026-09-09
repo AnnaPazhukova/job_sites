@@ -104,19 +104,31 @@ export class SupabaseAdapter implements DataAdapter {
       if (!data || data.length === 0) throw new StaleWriteError(key);
       lastKnownUpdatedAt[cacheKey] = nowIso;
     } else {
-      // No row was seen for this key yet (genuinely new, or loadAll()
-      // hasn't run) — nothing to conflict with, so a plain upsert is safe.
+      // No row was seen for this key yet — could be genuinely new, or it
+      // could be that loadAll() simply hasn't resolved yet in this tab (a
+      // caller firing set() before its own get() finished). Those two cases
+      // look identical here, so a plain upsert is NOT safe: if a row for
+      // this key already exists on the server, upsert would silently
+      // overwrite it with no conflict check at all — exactly how a stale
+      // "seed the app once" effect once clobbered a tutor's real data. Use
+      // insert instead: if the row is genuinely new it succeeds same as
+      // upsert would; if it already exists, the (user_id, key) primary key
+      // rejects it with a unique-violation, which is treated the same as a
+      // stale write below rather than overwriting.
       const { data, error } = await supabase
         .from("app_kv")
-        .upsert({ user_id: userId, key, value: value as object, updated_at: nowIso })
+        .insert({ user_id: userId, key, value: value as object, updated_at: nowIso })
         .select("updated_at")
         .single();
-      // Previously ignored: a write that Supabase rejected (RLS, network,
-      // quota) looked identical here to one that succeeded, so the UI kept
-      // showing the new value as saved right up until the next reload
-      // quietly reverted it — surfacing the error lets callers (see
-      // useStore) tell the tutor the save didn't actually go through.
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505") throw new StaleWriteError(key);
+        // Previously ignored: a write that Supabase rejected (RLS, network,
+        // quota) looked identical here to one that succeeded, so the UI kept
+        // showing the new value as saved right up until the next reload
+        // quietly reverted it — surfacing the error lets callers (see
+        // useStore) tell the tutor the save didn't actually go through.
+        throw error;
+      }
       lastKnownUpdatedAt[cacheKey] = data?.updated_at ?? nowIso;
     }
 

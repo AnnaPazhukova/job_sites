@@ -56,8 +56,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   const [lessons, setLessons] = useStore<Lesson[]>("lessons", []);
   const [homework, setHomework] = useStore<Homework[]>("homework", []);
   const [messages, setMessages] = useStore<MessagesByStudent>("messages", {});
-  const [tasks, saveTasks] = useStore<Task[]>("tasks", []);
-  const [notes, saveNotes] = useStore<MethodNote[]>("methodology-notes", []);
+  const [tasks, saveTasks, tasksLoaded] = useStore<Task[]>("tasks", []);
+  const [notes, saveNotes, notesLoaded] = useStore<MethodNote[]>("methodology-notes", []);
   const [seedFlags, saveSeedFlags, seedFlagsLoaded] = useStore<Record<string, boolean>>("seed-flags", {});
 
   const showToast = useCallback((text: string) => {
@@ -111,8 +111,14 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   // Seed the task bank & methodology library once, on first run. Loaded on
   // demand rather than imported at the top of the file — this content is
   // sizeable and, past that first run, never needed again.
+  //
+  // Waiting on tasksLoaded/notesLoaded (not just seedFlagsLoaded) matters:
+  // saveTasks/saveNotes below spread the *current* tasks/notes state, and
+  // until each has finished its own initial fetch that state is still its
+  // empty default — appending the seed batch to it then would overwrite
+  // whatever's actually on the server with just the seed content.
   useEffect(() => {
-    if (!seedFlagsLoaded) return;
+    if (!seedFlagsLoaded || !tasksLoaded || !notesLoaded) return;
     if (seedFlags.contentV1) return;
     import("./data/seedContent").then(({ SEED_TASKS_DATA, SEED_NOTES_DATA }) => {
       saveTasks([...tasks, ...SEED_TASKS_DATA]);
@@ -120,7 +126,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
       saveSeedFlags({ ...seedFlags, contentV1: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedFlagsLoaded]);
+  }, [seedFlagsLoaded, tasksLoaded, notesLoaded]);
 
   const pendingHw = homework.filter((h) => h.status === "submitted").length;
   // paymentStateOf (not the raw paymentStatus flag) so a free lesson —
