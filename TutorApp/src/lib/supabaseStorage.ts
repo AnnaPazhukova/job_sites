@@ -1,21 +1,11 @@
 import { supabase } from "./supabaseClient";
-import type { DataAdapter } from "./storage";
+import { StaleWriteError, type DataAdapter } from "./storage";
 
-// Thrown by SupabaseAdapter.set() when the row for `key` was changed on the
-// server (by another tab, another device, or a student-portal action like
-// sending a message) after this adapter last read it. A tab that's been
-// open a while holds a stale in-memory copy of that key; saving on top of
-// it would silently overwrite whatever changed in the meantime. Surfacing
-// this as a distinct error (see App.tsx's persist-error handler) lets the
-// UI tell the tutor to refresh instead of clobbering the newer data.
-export class StaleWriteError extends Error {
-  readonly key: string;
-  constructor(key: string) {
-    super(`"${key}" was changed elsewhere since this tab last loaded it`);
-    this.name = "StaleWriteError";
-    this.key = key;
-  }
-}
+// Re-exported so existing imports of StaleWriteError from this module (its
+// original home) keep working — the class itself now lives in storage.ts
+// since useStore's conflict-retry logic needs to reference it too, and
+// storage.ts can't import from here without a circular dependency.
+export { StaleWriteError };
 
 // The `updated_at` last seen for each (user, key), used as an
 // optimistic-concurrency token in set(): a write only lands if the row's
@@ -73,6 +63,29 @@ export class SupabaseAdapter implements DataAdapter {
   async get<T>(key: string): Promise<T | null> {
     const all = await this.loadAll();
     return key in all ? (all[key] as T) : null;
+  }
+
+  // Bypasses loadAll()'s memoized snapshot (fixed as of this tab's first
+  // load) to read this one key's current server row directly, updating the
+  // conflict-detection cache as it goes. useStore calls this to retry a save
+  // after a StaleWriteError against fresh data instead of the tab's stale
+  // copy — get() alone would just keep returning that same stale snapshot.
+  async refetch<T>(key: string): Promise<T | null> {
+    if (!supabase) return null;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const userId = session?.user.id;
+    if (!userId) return null;
+
+    const { data, error } = await supabase.from("app_kv").select("value, updated_at").eq("user_id", userId).eq("key", key).maybeSingle();
+    if (error || !data) return null;
+
+    lastKnownUpdatedAt[`${userId}:${key}`] = data.updated_at;
+    if (this.allRowsPromise) {
+      this.allRowsPromise = this.allRowsPromise.then((all) => ({ ...all, [key]: data.value }));
+    }
+    return data.value as T;
   }
 
   async set<T>(key: string, value: T): Promise<void> {

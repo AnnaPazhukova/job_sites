@@ -20,6 +20,7 @@ import {
   type RecurrenceFreq,
 } from "../lib/utils";
 import type { Attachment, Group, Homework, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 import type { GcalEvent } from "../lib/googleCalendar";
 import { useGoogleCalendar } from "../lib/useGoogleCalendar";
 import { MiniCalendar } from "../components/MiniCalendar";
@@ -31,14 +32,14 @@ type DayItem = { kind: "gcal"; e: GcalEvent } | { kind: "lesson"; l: Lesson };
 
 interface Props {
   lessons: Lesson[];
-  setLessons: (l: Lesson[]) => void;
+  setLessons: (l: Updater<Lesson[]>) => void;
   students: Student[];
   setStudents: (s: Student[]) => void;
   groups: Group[];
   homework: Homework[];
-  setHomework: (h: Homework[]) => void;
+  setHomework: (h: Updater<Homework[]>) => void;
   messages: MessagesByStudent;
-  setMessages: (m: MessagesByStudent) => void;
+  setMessages: (m: Updater<MessagesByStudent>) => void;
   notes: MethodNote[];
   saveNotes: (n: MethodNote[]) => void;
   showToast: (t: string) => void;
@@ -52,7 +53,6 @@ export function ScheduleView({
   groups,
   homework,
   setHomework,
-  messages,
   setMessages,
   notes,
   saveNotes,
@@ -158,7 +158,7 @@ export function ScheduleView({
         noteId,
       };
     });
-    setLessons([...lessons, ...created]);
+    setLessons((lessons) => [...lessons, ...created]);
     if (cycle && targetStudent && cycle !== targetStudent.topicCycle) {
       setStudents(students.map((s) => (s.id === targetStudent.id ? { ...s, topicCycle: cycle } : s)));
     }
@@ -187,7 +187,7 @@ export function ScheduleView({
       nextNoteIds.set(lesson.id, advanced.noteId);
       cycle = advanced.cycle;
     }
-    setLessons(lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
+    setLessons((lessons) => lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
     setStudents(students.map((s) => (s.id === studentId ? { ...s, topicCycle: cycle } : s)));
     showToast(upcoming.length > 0 ? `Темы расставлены: ${upcoming.length} занятий` : "Темы будут расставляться для новых занятий");
   }
@@ -217,7 +217,7 @@ export function ScheduleView({
     if (prev && data.subscriptionDeducted !== undefined && data.subscriptionDeducted !== wasDeducted) {
       applySubscriptionDelta(prev.studentId, wasDeducted ? 1 : -1);
     }
-    setLessons(lessons.map((l) => (l.id === data.id ? { ...l, ...data } : l)));
+    setLessons((lessons) => lessons.map((l) => (l.id === data.id ? { ...l, ...data } : l)));
     showToast("Занятие обновлено");
     setEditLesson(null);
   }
@@ -225,7 +225,7 @@ export function ScheduleView({
   function cancelLessonEdit(id: string) {
     const lesson = lessons.find((l) => l.id === id);
     if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled", subscriptionDeducted: false } : l)));
+    setLessons((lessons) => lessons.map((l) => (l.id === id ? { ...l, status: "cancelled", subscriptionDeducted: false } : l)));
     showToast("Занятие отменено");
     setEditLesson(null);
   }
@@ -240,7 +240,7 @@ export function ScheduleView({
     const refund = toDelete.filter((l) => l.subscriptionDeducted).length;
     if (refund > 0) applySubscriptionDelta(lesson.studentId, refund);
     const idsToDelete = new Set(toDelete.map((l) => l.id));
-    setLessons(lessons.filter((l) => !idsToDelete.has(l.id)));
+    setLessons((lessons) => lessons.filter((l) => !idsToDelete.has(l.id)));
     showToast(toDelete.length > 1 ? `Удалено занятий: ${toDelete.length}` : "Занятие удалено");
     setEditLesson(null);
   }
@@ -248,33 +248,36 @@ export function ScheduleView({
   function approveCancelRequest(id: string) {
     const lesson = lessons.find((l) => l.id === id);
     if (lesson?.subscriptionDeducted) applySubscriptionDelta(lesson.studentId, 1);
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false, subscriptionDeducted: false } : l)));
+    setLessons((lessons) =>
+      lessons.map((l) => (l.id === id ? { ...l, status: "cancelled" as const, cancelRequested: false, subscriptionDeducted: false } : l))
+    );
     showToast("Занятие отменено");
   }
 
   function declineCancelRequest(id: string) {
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, cancelRequested: false } : l)));
+    setLessons((lessons) => lessons.map((l) => (l.id === id ? { ...l, cancelRequested: false } : l)));
     showToast("Запрос на отмену отклонён");
   }
 
   function moveLesson(id: string, date: string, time: string) {
-    setLessons(lessons.map((l) => (l.id === id ? { ...l, date, time } : l)));
+    setLessons((lessons) => lessons.map((l) => (l.id === id ? { ...l, date, time } : l)));
     showToast("Занятие перенесено");
     setEditLesson(null);
   }
 
   function handleAssignHomework(title: string, noteId?: string, due?: string, attachments?: Attachment[]) {
     if (!editLesson || !editLesson.studentId) return;
-    const st = students.find((s) => s.id === editLesson.studentId);
+    const studentId = editLesson.studentId;
+    const st = students.find((s) => s.id === studentId);
     const { homework: hw, message } = buildHomeworkAssignment({ ...editLesson, noteId }, st?.name || editLesson.title, title, lessons, { due, attachments });
-    setHomework([...homework, hw]);
-    setMessages({ ...messages, [editLesson.studentId]: [...(messages[editLesson.studentId] || []), message] });
+    setHomework((homework) => [...homework, hw]);
+    setMessages((messages) => ({ ...messages, [studentId]: [...(messages[studentId] || []), message] }));
     syncHomeworkAttachmentsToNote(hw, notes, saveNotes);
     showToast("Домашнее задание задано");
   }
 
   function handleUpdateHomework(id: string, patch: Partial<Homework>) {
-    setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    setHomework((homework) => homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
     const updated = homework.find((h) => h.id === id);
     if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     showToast("Домашнее задание обновлено");
