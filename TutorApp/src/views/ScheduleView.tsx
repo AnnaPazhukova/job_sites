@@ -535,14 +535,15 @@ export function ScheduleView({
       {editLesson &&
         (() => {
           const { prev, next } = adjacentLessons(lessons, editLesson);
+          const editStudent = students.find((s) => s.id === editLesson.studentId);
           return (
             <LessonFormModal
               key={editLesson.id}
-              studentName={students.find((s) => s.id === editLesson.studentId)?.name || editLesson.title}
-              studentGrade={students.find((s) => s.id === editLesson.studentId)?.grade}
-              defaultRate={editLesson.price}
-              defaultDuration={editLesson.duration}
-              subscription={students.find((s) => s.id === editLesson.studentId)?.subscription}
+              studentName={editStudent?.name || editLesson.title}
+              studentGrade={editStudent?.grade}
+              defaultRate={editStudent?.rate || 0}
+              defaultDuration={editStudent?.duration || 60}
+              subscription={editStudent?.subscription}
               previousLesson={prev}
               lesson={editLesson}
               seriesSize={editLesson.seriesId ? lessons.filter((l) => l.seriesId === editLesson.seriesId).length : 0}
