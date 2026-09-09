@@ -14,6 +14,7 @@ import {
   Layers,
   Mail,
   MessageCircle,
+  Paperclip,
   Plus,
   School,
   Star,
@@ -833,6 +834,36 @@ export function TopicCycleEditor({
   );
 }
 
+// Lets the tutor attach a file already stored on the lesson's methodology
+// topic (MethodNote.attachments.homework) to the homework being assigned or
+// edited here, instead of re-uploading the same worksheet every time. Only
+// offers files not already attached; picking one adds it to `selected`
+// (via onAdd) — it stays a copy, so removing it here doesn't touch the note.
+function NoteAttachmentsPicker({ topic, files, selected, onAdd }: { topic: string; files: Attachment[]; selected: Attachment[]; onAdd: (a: Attachment) => void }) {
+  const selectedIds = new Set(selected.map((a) => a.id));
+  const available = files.filter((f) => !selectedIds.has(f.id));
+  if (available.length === 0) return null;
+  return (
+    <div>
+      <div className="text-xs text-gray-500 mb-1.5">Файлы из методики «{topic}»</div>
+      <div className="flex flex-wrap gap-2">
+        {available.map((f) => (
+          <button
+            type="button"
+            key={f.id}
+            onClick={() => onAdd(f)}
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-[#2563EB] hover:bg-blue-50 transition"
+          >
+            <Paperclip size={12} className="shrink-0" />
+            <span className="truncate max-w-[160px]">{f.name}</span>
+            <Plus size={12} className="shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface LessonFormProps {
   studentName: string;
   studentGrade?: string;
@@ -1229,6 +1260,14 @@ export function LessonFormModal({
                         <TextInput type="date" value={hwEditDue} onChange={(e) => setHwEditDue(e.target.value)} />
                       </Field>
                       <AttachmentsField attachments={hwEditAttachments} onChange={setHwEditAttachments} label="Файлы к заданию" />
+                      {selectedNote?.attachments?.homework && (
+                        <NoteAttachmentsPicker
+                          topic={selectedNote.topic}
+                          files={selectedNote.attachments.homework}
+                          selected={hwEditAttachments}
+                          onAdd={(a) => setHwEditAttachments([...hwEditAttachments, a])}
+                        />
+                      )}
                       <div className="flex gap-2">
                         <GhostButton full onClick={() => setEditingHw(false)}>
                           Отмена
@@ -1273,6 +1312,14 @@ export function LessonFormModal({
                       <TextInput type="date" value={hwDue} onChange={(e) => setHwDue(e.target.value)} />
                     </Field>
                     <AttachmentsField attachments={hwAttachments} onChange={setHwAttachments} label="Файлы к заданию" />
+                    {selectedNote?.attachments?.homework && (
+                      <NoteAttachmentsPicker
+                        topic={selectedNote.topic}
+                        files={selectedNote.attachments.homework}
+                        selected={hwAttachments}
+                        onAdd={(a) => setHwAttachments([...hwAttachments, a])}
+                      />
+                    )}
                     <GhostButton icon={BookOpen} onClick={assignHomework} disabled={!hwText.trim()}>
                       Задать домашнее задание
                     </GhostButton>
