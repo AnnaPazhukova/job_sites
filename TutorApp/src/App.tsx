@@ -11,8 +11,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { setPersistErrorHandler, useStore } from "./lib/storage";
-import { StaleWriteError } from "./lib/supabaseStorage";
+import { setPersistErrorHandler, StaleWriteError, useStore } from "./lib/storage";
 import { isLessonPast, paymentStateOf } from "./lib/utils";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
 

@@ -4,10 +4,11 @@ import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, P
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 interface Props {
   homework: Homework[];
-  setHomework: (h: Homework[]) => void;
+  setHomework: (h: Updater<Homework[]>) => void;
   students: Student[];
   lessons: Lesson[];
   notes: MethodNote[];
@@ -43,7 +44,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   function updateHomework(id: string, patch: Partial<Homework>) {
-    setHomework(homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    setHomework((homework) => homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
     const updated = homework.find((h) => h.id === id);
     if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     setEditingHw(null);
@@ -59,7 +60,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
   );
 
   function markDone(id: string) {
-    setHomework(homework.map((h) => (h.id === id ? { ...h, status: "done" as HomeworkStatus } : h)));
+    setHomework((homework) => homework.map((h) => (h.id === id ? { ...h, status: "done" as HomeworkStatus } : h)));
     showToast("Работа отмечена как проверенная");
   }
 
@@ -73,7 +74,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     attachments: Attachment[];
   }) {
     const created: Homework = { id: uid(), status: "assigned", createdAt: Date.now(), ...data };
-    setHomework([created, ...homework]);
+    setHomework((homework) => [created, ...homework]);
     syncHomeworkAttachmentsToNote(created, notes, saveNotes);
     setShowAdd(false);
     showToast("Домашнее задание добавлено");

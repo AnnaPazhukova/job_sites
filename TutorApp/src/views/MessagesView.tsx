@@ -4,11 +4,12 @@ import { Avatar, Card, EmptyState, PageHeader } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { uid } from "../lib/utils";
 import type { Attachment, MessagesByStudent, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 interface Props {
   students: Student[];
   messages: MessagesByStudent;
-  setMessages: (m: MessagesByStudent) => void;
+  setMessages: (m: Updater<MessagesByStudent>) => void;
 }
 
 export function MessagesView({ students, messages, setMessages }: Props) {
@@ -25,11 +26,8 @@ export function MessagesView({ students, messages, setMessages }: Props) {
 
   function send() {
     if ((!text.trim() && pendingFiles.length === 0) || !activeId) return;
-    const next = {
-      ...messages,
-      [activeId]: [...thread, { id: uid(), from: "me" as const, text: text.trim(), at: Date.now(), attachments: pendingFiles.length ? pendingFiles : undefined }],
-    };
-    setMessages(next);
+    const newMessage = { id: uid(), from: "me" as const, text: text.trim(), at: Date.now(), attachments: pendingFiles.length ? pendingFiles : undefined };
+    setMessages((messages) => ({ ...messages, [activeId]: [...(messages[activeId] || []), newMessage] }));
     setText("");
     setPendingFiles([]);
     setShowAttach(false);
