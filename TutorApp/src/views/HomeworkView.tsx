@@ -264,7 +264,7 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
           }}
         />
       )}
-      {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={updateHomework} />}
+      {editingHw && <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={updateHomework} />}
     </div>
   );
 }
@@ -277,20 +277,25 @@ const HW_STATUS_OPTIONS: { value: HomeworkStatus; label: string }[] = [
 
 export function HomeworkEditModal({
   homework,
+  notes,
   onClose,
   onSave,
 }: {
   homework: Homework;
+  notes: MethodNote[];
   onClose: () => void;
   onSave: (id: string, patch: Partial<Homework>) => void;
 }) {
   const [title, setTitle] = useState(homework.title);
   const [due, setDue] = useState(homework.due || "");
+  const [noteId, setNoteId] = useState(homework.noteId || "");
   const [status, setStatus] = useState<HomeworkStatus>(normalizeHomeworkStatus(homework.status));
   const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
   const [submissionAttachments, setSubmissionAttachments] = useState<Attachment[]>(homework.submissionAttachments || []);
   const [reviewComment, setReviewComment] = useState(homework.reviewComment || "");
   const [grade, setGrade] = useState<number | undefined>(homework.grade);
+
+  const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -298,6 +303,7 @@ export function HomeworkEditModal({
     onSave(homework.id, {
       title: title.trim(),
       due: due || null,
+      noteId: noteId || undefined,
       status,
       attachments,
       submissionAttachments,
@@ -330,6 +336,9 @@ export function HomeworkEditModal({
         </Field>
         <Field label="Срок сдачи">
           <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </Field>
+        <Field label="Урок из методики">
+          <MethodNotePicker notes={notes} value={noteId} onChange={setNoteId} />
         </Field>
         <Field label="Статус">
           <div className="grid grid-cols-3 gap-2">
@@ -374,12 +383,62 @@ export function HomeworkEditModal({
           />
           <div className="text-xs text-gray-400 mt-1">Увидит ученик в личном кабинете.</div>
         </Field>
-        <AttachmentsField attachments={attachments} onChange={setAttachments} />
+        <div className="space-y-2">
+          <AttachmentsField attachments={attachments} onChange={setAttachments} />
+          {selectedNote?.attachments?.homework && (
+            <NoteAttachmentsPicker
+              topic={selectedNote.topic}
+              files={selectedNote.attachments.homework}
+              selected={attachments}
+              onAdd={(a) => setAttachments((prev) => [...prev, a])}
+            />
+          )}
+        </div>
         <PrimaryButton type="submit" full>
           Сохранить
         </PrimaryButton>
       </form>
     </Modal>
+  );
+}
+
+// Lets the tutor attach a file already stored on a methodology topic
+// (MethodNote.attachments.homework) to the homework being assigned or
+// edited here, instead of re-uploading the same worksheet every time. Only
+// offers files not already attached; picking one adds it to `selected`
+// (via onAdd) — it stays a copy, so removing it here doesn't touch the note.
+export function NoteAttachmentsPicker({
+  topic,
+  files,
+  selected,
+  onAdd,
+}: {
+  topic: string;
+  files: Attachment[];
+  selected: Attachment[];
+  onAdd: (a: Attachment) => void;
+}) {
+  const selectedIds = new Set(selected.map((a) => a.id));
+  const available = files.filter((f) => !selectedIds.has(f.id));
+  if (available.length === 0) return null;
+  return (
+    <div>
+      <div className="text-xs text-gray-500 mb-1.5">Файлы из методики «{topic}»</div>
+      <div className="flex flex-wrap gap-2">
+        {available.map((f) => (
+          <button
+            type="button"
+            key={f.id}
+            onClick={() => onAdd(f)}
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-[#2563EB] hover:bg-blue-50 transition"
+          >
+            <Paperclip size={12} className="shrink-0" />
+            <span className="truncate max-w-[160px]">{f.name}</span>
+            <Plus size={12} className="shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -512,6 +571,14 @@ function AddHomeworkModal({
           />
         </Field>
         <AttachmentsField attachments={attachments} onChange={setAttachments} />
+        {selectedNote?.attachments?.homework && (
+          <NoteAttachmentsPicker
+            topic={selectedNote.topic}
+            files={selectedNote.attachments.homework}
+            selected={attachments}
+            onAdd={(a) => setAttachments((prev) => [...prev, a])}
+          />
+        )}
         <PrimaryButton type="submit" full disabled={students.length === 0}>
           Задать ДЗ
         </PrimaryButton>

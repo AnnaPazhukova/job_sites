@@ -14,7 +14,6 @@ import {
   Layers,
   Mail,
   MessageCircle,
-  Paperclip,
   Plus,
   School,
   Star,
@@ -50,7 +49,7 @@ import {
   type RecurrenceFreq,
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
-import { HomeworkEditModal } from "./HomeworkView";
+import { HomeworkEditModal, NoteAttachmentsPicker } from "./HomeworkView";
 import type { Attachment, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, Student, Subscription, ViewId } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
@@ -667,7 +666,7 @@ export function StudentDetailPage({
           );
         })()}
 
-      {editingHw && <HomeworkEditModal homework={editingHw} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
+      {editingHw && <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
     </div>
   );
 }
@@ -835,35 +834,6 @@ export function TopicCycleEditor({
   );
 }
 
-// Lets the tutor attach a file already stored on the lesson's methodology
-// topic (MethodNote.attachments.homework) to the homework being assigned or
-// edited here, instead of re-uploading the same worksheet every time. Only
-// offers files not already attached; picking one adds it to `selected`
-// (via onAdd) — it stays a copy, so removing it here doesn't touch the note.
-function NoteAttachmentsPicker({ topic, files, selected, onAdd }: { topic: string; files: Attachment[]; selected: Attachment[]; onAdd: (a: Attachment) => void }) {
-  const selectedIds = new Set(selected.map((a) => a.id));
-  const available = files.filter((f) => !selectedIds.has(f.id));
-  if (available.length === 0) return null;
-  return (
-    <div>
-      <div className="text-xs text-gray-500 mb-1.5">Файлы из методики «{topic}»</div>
-      <div className="flex flex-wrap gap-2">
-        {available.map((f) => (
-          <button
-            type="button"
-            key={f.id}
-            onClick={() => onAdd(f)}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-[#2563EB] hover:bg-blue-50 transition"
-          >
-            <Paperclip size={12} className="shrink-0" />
-            <span className="truncate max-w-[160px]">{f.name}</span>
-            <Plus size={12} className="shrink-0" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 interface LessonFormProps {
   studentName: string;
