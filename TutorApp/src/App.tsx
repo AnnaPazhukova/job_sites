@@ -120,8 +120,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     if (!seedFlagsLoaded || !tasksLoaded || !notesLoaded) return;
     if (seedFlags.contentV1) return;
     import("./data/seedContent").then(({ SEED_TASKS_DATA, SEED_NOTES_DATA }) => {
-      saveTasks([...tasks, ...SEED_TASKS_DATA]);
-      saveNotes([...notes, ...SEED_NOTES_DATA]);
+      saveTasks((tasks) => [...tasks, ...SEED_TASKS_DATA]);
+      saveNotes((notes) => [...notes, ...SEED_NOTES_DATA]);
       saveSeedFlags({ ...seedFlags, contentV1: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

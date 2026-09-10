@@ -1,4 +1,5 @@
 import type { Attachment, ChatMessage, Homework, HomeworkStatus, Lesson, MethodNote, MethodNoteAttachments, Student } from "./types";
+import type { Updater } from "./storage";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -210,16 +211,30 @@ export function buildHomeworkAssignment(
 // (MethodNote.attachments.homework), deduped by attachment id so calling
 // this again for the same homework (e.g. after an edit) doesn't pile up
 // duplicates. No-ops when the homework has no linked topic or no files.
-export function syncHomeworkAttachmentsToNote(homework: Homework, notes: MethodNote[], saveNotes: (next: MethodNote[]) => void): void {
+export function syncHomeworkAttachmentsToNote(homework: Homework, notes: MethodNote[], saveNotes: (next: Updater<MethodNote[]>) => void): void {
   if (!homework.noteId || !homework.attachments?.length) return;
   const note = notes.find((n) => n.id === homework.noteId);
   if (!note) return;
   const existing = note.attachments?.homework || [];
   const existingIds = new Set(existing.map((a) => a.id));
-  const newFiles = homework.attachments.filter((a) => !existingIds.has(a.id));
-  if (newFiles.length === 0) return;
-  const nextAttachments: MethodNoteAttachments = { ...(note.attachments || {}), homework: [...existing, ...newFiles] };
-  saveNotes(notes.map((n) => (n.id === note.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
+  if (!homework.attachments.some((a) => !existingIds.has(a.id))) return;
+
+  const noteId = note.id;
+  const files = homework.attachments;
+  // Recomputed against fresh data on a stale-write retry (see Updater in
+  // lib/storage.ts) rather than closing over this render's `notes` — the
+  // dedup above is just an early exit so a no-op call skips scheduling a
+  // write at all.
+  saveNotes((notes) => {
+    const current = notes.find((n) => n.id === noteId);
+    if (!current) return notes;
+    const currentExisting = current.attachments?.homework || [];
+    const currentExistingIds = new Set(currentExisting.map((a) => a.id));
+    const newFiles = files.filter((a) => !currentExistingIds.has(a.id));
+    if (newFiles.length === 0) return notes;
+    const nextAttachments: MethodNoteAttachments = { ...(current.attachments || {}), homework: [...currentExisting, ...newFiles] };
+    return notes.map((n) => (n.id === noteId ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n));
+  });
 }
 
 // Topics for one grade+subject, in the order they're stored — NotesView

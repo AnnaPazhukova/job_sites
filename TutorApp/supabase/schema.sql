@@ -330,3 +330,111 @@ end;
 $$;
 
 grant execute on function public.portal_request_lesson_cancel(text, text) to anon, authenticated;
+
+-- Version history for app_kv: every value a row held right before it was
+-- overwritten (or removed), kept forever. Several past incidents lost the
+-- methodology library (and, once, other data) to a bad write — a client
+-- race condition, a stale browser tab silently overwriting fresher server
+-- data, a mistaken admin fix — and recovering it meant piecing it back
+-- together from chat transcripts and scratch files. With this in place, any
+-- previous state of any key is just a SELECT away:
+--   select value from public.app_kv_history
+--   where user_id = '<uid>' and key = 'methodology-notes'
+--   order by archived_at desc limit 20;
+create table if not exists public.app_kv_history (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  key text not null,
+  value jsonb not null,
+  value_updated_at timestamptz not null,
+  archived_at timestamptz not null default now()
+);
+
+create index if not exists app_kv_history_lookup on public.app_kv_history (user_id, key, archived_at desc);
+
+alter table public.app_kv_history enable row level security;
+
+drop policy if exists "read own history" on public.app_kv_history;
+create policy "read own history" on public.app_kv_history
+  for select using ((select auth.uid()) = user_id);
+
+-- Deliberately no insert/update/delete policy for anon/authenticated —
+-- only the security-definer trigger below (running as its owner, not the
+-- calling user) ever writes a row here, so a client bug or a compromised
+-- session can read history but never rewrite or clear it.
+create or replace function public.app_kv_archive_previous_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.app_kv_history (user_id, key, value, value_updated_at)
+  values (old.user_id, old.key, old.value, old.updated_at);
+  return new;
+end;
+$$;
+
+drop trigger if exists app_kv_archive_before_update on public.app_kv;
+create trigger app_kv_archive_before_update
+  before update on public.app_kv
+  for each row
+  execute function public.app_kv_archive_previous_version();
+
+-- The app never deletes an app_kv row today, but archiving on delete too
+-- costs nothing and closes the gap if that ever changes.
+drop trigger if exists app_kv_archive_before_delete on public.app_kv;
+create trigger app_kv_archive_before_delete
+  before delete on public.app_kv
+  for each row
+  execute function public.app_kv_archive_previous_version();
+
+-- Hard guard on the methodology library specifically: every "lost the
+-- methodology" incident so far was one write that replaced the
+-- `methodology-notes` array with something far smaller (a seeding race
+-- overwriting real data with starter content, a stale tab overwriting a
+-- fix). The tutor's own content is meant to only grow or change in place —
+-- this blocks any single write that drops more than 10 topics at once,
+-- independent of which app-side bug (found or not-yet-found) produced it.
+-- A genuine bulk cleanup that needs to remove more than 10 topics in one go
+-- can still be done — temporarily run
+--   alter table public.app_kv disable trigger app_kv_guard_methodology_notes_trigger;
+-- do the write, then re-enable it.
+create or replace function public.app_kv_guard_methodology_notes()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  old_len int;
+  new_len int;
+begin
+  if new.key <> 'methodology-notes' then
+    return new;
+  end if;
+  if jsonb_typeof(old.value) <> 'array' or jsonb_typeof(new.value) <> 'array' then
+    return new;
+  end if;
+  old_len := jsonb_array_length(old.value);
+  new_len := jsonb_array_length(new.value);
+  if new_len < old_len - 10 then
+    raise exception
+      'Заблокировано: методика уменьшилась бы с % до % тем (потеря более 10 тем за одну запись). Предыдущее состояние доступно в app_kv_history. Если это осознанное удаление — см. комментарий у app_kv_guard_methodology_notes_trigger.',
+      old_len, new_len;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists app_kv_guard_methodology_notes_trigger on public.app_kv;
+create trigger app_kv_guard_methodology_notes_trigger
+  before update on public.app_kv
+  for each row
+  execute function public.app_kv_guard_methodology_notes();
+
+-- Both trigger functions above are `returns trigger` — Postgres already
+-- refuses to invoke them via a normal function call outside trigger
+-- context — but revoking the default PUBLIC execute grant keeps them off
+-- the PostgREST RPC surface entirely instead of relying on that.
+revoke execute on function public.app_kv_archive_previous_version() from public, anon, authenticated;
+revoke execute on function public.app_kv_guard_methodology_notes() from public, anon, authenticated;

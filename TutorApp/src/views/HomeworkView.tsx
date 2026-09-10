@@ -12,7 +12,7 @@ interface Props {
   students: Student[];
   lessons: Lesson[];
   notes: MethodNote[];
-  saveNotes: (n: MethodNote[]) => void;
+  saveNotes: (n: Updater<MethodNote[]>) => void;
   onOpenNote: (id: string) => void;
   showToast: (t: string) => void;
 }

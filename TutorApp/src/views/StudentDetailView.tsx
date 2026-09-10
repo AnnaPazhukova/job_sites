@@ -72,7 +72,7 @@ interface Props {
   messages: MessagesByStudent;
   setMessages: (m: Updater<MessagesByStudent>) => void;
   notes: MethodNote[];
-  saveNotes: (n: MethodNote[]) => void;
+  saveNotes: (n: Updater<MethodNote[]>) => void;
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
