@@ -237,6 +237,26 @@ export function syncHomeworkAttachmentsToNote(homework: Homework, notes: MethodN
   });
 }
 
+// Every file a methodology topic has, across all its tabs (theory, rules,
+// tasks, test, homework) — not just the ones filed under "homework". In
+// practice a tutor attaches a worksheet or photo to whichever tab she
+// happens to be on while teaching (usually Theory/Rules), not necessarily
+// the Д/З tab, so offering only `attachments.homework` when assigning
+// homework left most of a topic's files impossible to find or attach there.
+export function allNoteAttachments(note: MethodNote | null | undefined): Attachment[] {
+  if (!note?.attachments) return [];
+  const seen = new Set<string>();
+  const result: Attachment[] = [];
+  for (const files of Object.values(note.attachments)) {
+    for (const a of files || []) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      result.push(a);
+    }
+  }
+  return result;
+}
+
 // Topics for one grade+subject, in the order they're stored — NotesView
 // never resorts them client-side, so storage order *is* topic order (e.g.
 // "1. ...", "2. ..."), and this relies on that same convention.

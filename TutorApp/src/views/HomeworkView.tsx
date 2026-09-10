@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
-import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
+import { allNoteAttachments, fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
@@ -385,10 +385,10 @@ export function HomeworkEditModal({
         </Field>
         <div className="space-y-2">
           <AttachmentsField attachments={attachments} onChange={setAttachments} />
-          {selectedNote?.attachments?.homework && (
+          {selectedNote && allNoteAttachments(selectedNote).length > 0 && (
             <NoteAttachmentsPicker
               topic={selectedNote.topic}
-              files={selectedNote.attachments.homework}
+              files={allNoteAttachments(selectedNote)}
               selected={attachments}
               onAdd={(a) => setAttachments((prev) => [...prev, a])}
             />
@@ -403,7 +403,8 @@ export function HomeworkEditModal({
 }
 
 // Lets the tutor attach a file already stored on a methodology topic
-// (MethodNote.attachments.homework) to the homework being assigned or
+// (any of its tabs — Theory, Rules, Tasks, Test, Homework, wherever she
+// happened to upload it while teaching) to the homework being assigned or
 // edited here, instead of re-uploading the same worksheet every time. Only
 // offers files not already attached; picking one adds it to `selected`
 // (via onAdd) — it stays a copy, so removing it here doesn't touch the note.
@@ -571,10 +572,10 @@ function AddHomeworkModal({
           />
         </Field>
         <AttachmentsField attachments={attachments} onChange={setAttachments} />
-        {selectedNote?.attachments?.homework && (
+        {selectedNote && allNoteAttachments(selectedNote).length > 0 && (
           <NoteAttachmentsPicker
             topic={selectedNote.topic}
-            files={selectedNote.attachments.homework}
+            files={allNoteAttachments(selectedNote)}
             selected={attachments}
             onAdd={(a) => setAttachments((prev) => [...prev, a])}
           />
