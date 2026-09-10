@@ -122,9 +122,25 @@ export default function App({ userEmail, onSignOut }: AppProps) {
     if (!seedFlagsLoaded || !tasksLoaded || !notesLoaded) return;
     if (seedFlags.contentV1) return;
     import("./data/seedContent").then(({ SEED_TASKS_DATA, SEED_NOTES_DATA }) => {
-      saveTasks((tasks) => [...tasks, ...SEED_TASKS_DATA]);
-      saveNotes((notes) => [...notes, ...SEED_NOTES_DATA]);
-      saveSeedFlags({ ...seedFlags, contentV1: true });
+      // Two tabs/devices open at once can both pass the `contentV1` check
+      // above before either has written it back — this happened in
+      // production and appended the whole starter set twice (with fresh
+      // random ids each time, so plain id-dedup wouldn't have caught it).
+      // Keying on content instead means a second, concurrent run is a
+      // no-op regardless of timing. saveSeedFlags also switched to the
+      // functional form so a stale-write retry doesn't leave the flag
+      // unset and invite a third run later.
+      saveTasks((tasks) => {
+        const existing = new Set(tasks.map((t) => `${t.grade}|${t.subject}|${t.topic}|${t.subtopic}|${t.text}`));
+        const toAdd = SEED_TASKS_DATA.filter((t) => !existing.has(`${t.grade}|${t.subject}|${t.topic}|${t.subtopic}|${t.text}`));
+        return toAdd.length ? [...tasks, ...toAdd] : tasks;
+      });
+      saveNotes((notes) => {
+        const existing = new Set(notes.map((n) => `${n.grade}|${n.subject}|${n.topic}`));
+        const toAdd = SEED_NOTES_DATA.filter((n) => !existing.has(`${n.grade}|${n.subject}|${n.topic}`));
+        return toAdd.length ? [...notes, ...toAdd] : notes;
+      });
+      saveSeedFlags((flags) => ({ ...flags, contentV1: true }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedFlagsLoaded, tasksLoaded, notesLoaded]);
