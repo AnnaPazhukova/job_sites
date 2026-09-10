@@ -5,6 +5,7 @@ import { AttachmentList, AttachmentsField, LargeAttachmentList } from "../compon
 import { fmtDateRu, GRADES, lessonLabel, sortHomeworkNewestFirst, uid } from "../lib/utils";
 import { STARTER_CONTENT } from "../lib/methodologyContent";
 import type { Attachment, Homework, Lesson, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Student, Task } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 const subjectsForGrade = (grade: string) => {
   if (grade === "5 класс" || grade === "6 класс") return ["Математика"];
@@ -70,7 +71,7 @@ const HW_STATUS_LABELS: Record<Homework["status"], string> = {
 
 interface Props {
   notes: MethodNote[];
-  saveNotes: (n: MethodNote[]) => void;
+  saveNotes: (n: Updater<MethodNote[]>) => void;
   tasks: Task[];
   homework: Homework[];
   lessons: Lesson[];
@@ -123,7 +124,7 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   const handleCreate = () => {
     if (!newTopic.trim()) return;
     const note = { ...emptyNote(), topic: newTopic.trim(), grade: newGrade, subject: newSubject };
-    saveNotes([...notes, note]);
+    saveNotes((notes) => [...notes, note]);
     setActiveId(note.id);
     setNewTopic("");
     setCreating(false);
@@ -132,7 +133,7 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
 
   const handleSaveDraft = () => {
     if (!active) return;
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, tabs: draftTabs, updatedAt: Date.now() } : n)));
+    saveNotes((notes) => notes.map((n) => (n.id === activeId ? { ...n, tabs: draftTabs, updatedAt: Date.now() } : n)));
     showToast("Заметка сохранена");
   };
 
@@ -146,14 +147,18 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
       if (value && !next[k]?.trim()) next[k] = value;
     });
     setDraftTabs(next);
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, tabs: next, updatedAt: Date.now() } : n)));
+    saveNotes((notes) => notes.map((n) => (n.id === activeId ? { ...n, tabs: next, updatedAt: Date.now() } : n)));
     showToast("Вкладки заполнены типовым текстом");
   };
 
-  const handleFillAllStarter = () => {
+  // Shared by the preview count below and the actual (retry-safe) write —
+  // takes the base list as a parameter instead of closing over `notes` so a
+  // stale-write retry (see Updater in lib/storage.ts) recomputes it against
+  // fresh data rather than this render's possibly-outdated snapshot.
+  const fillAllStarter = (base: MethodNote[]) => {
     const filteredIds = new Set(filteredNotes.map((n) => n.id));
     let filledCount = 0;
-    const next = notes.map((n) => {
+    const next = base.map((n) => {
       if (!filteredIds.has(n.id)) return n;
       const starter = STARTER_CONTENT[`${n.grade}|${displaySubject(n.subject)}|${n.topic}`];
       if (!starter) return n;
@@ -170,11 +175,16 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
       filledCount++;
       return { ...n, tabs: nextTabs, updatedAt: Date.now() };
     });
+    return { next, filledCount };
+  };
+
+  const handleFillAllStarter = () => {
+    const { next, filledCount } = fillAllStarter(notes);
     if (filledCount === 0) {
       showToast("Нечего заполнять: в текущем списке нет тем с типовым текстом");
       return;
     }
-    saveNotes(next);
+    saveNotes((notes) => fillAllStarter(notes).next);
     if (active) setDraftTabs(getTabs(next.find((n) => n.id === active.id) || null));
     showToast(`Заполнено тем: ${filledCount}`);
   };
@@ -190,7 +200,7 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
     const next = topicDraft.trim();
     setEditingTopic(false);
     if (!next || next === active.topic) return;
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, topic: next, updatedAt: Date.now() } : n)));
+    saveNotes((notes) => notes.map((n) => (n.id === activeId ? { ...n, topic: next, updatedAt: Date.now() } : n)));
     showToast("Название темы обновлено");
   };
 
@@ -202,15 +212,20 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   const handleGroupAttachmentsChange = (group: { keys: MethodNoteTabKey[] }, next: Attachment[]) => {
     if (!active) return;
     const [primaryKey, ...dropKeys] = group.keys;
-    const restAttachments = { ...(active.attachments || {}) };
-    for (const key of dropKeys) delete restAttachments[key];
-    const nextAttachments: MethodNoteAttachments = { ...restAttachments, [primaryKey]: next };
-    saveNotes(notes.map((n) => (n.id === active.id ? { ...n, attachments: nextAttachments, updatedAt: Date.now() } : n)));
+    saveNotes((notes) =>
+      notes.map((n) => {
+        if (n.id !== activeId) return n;
+        const restAttachments = { ...(n.attachments || {}) };
+        for (const key of dropKeys) delete restAttachments[key];
+        const nextAttachments: MethodNoteAttachments = { ...restAttachments, [primaryKey]: next };
+        return { ...n, attachments: nextAttachments, updatedAt: Date.now() };
+      })
+    );
   };
 
   const handleDelete = (id: string) => {
     const next = notes.filter((n) => n.id !== id);
-    saveNotes(next);
+    saveNotes((notes) => notes.filter((n) => n.id !== id));
     if (activeId === id) setActiveId(next[0]?.id ?? null);
   };
 
@@ -220,15 +235,17 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
 
   const moveNote = (draggedId: string, targetId: string, after: boolean) => {
     if (draggedId === targetId) return;
-    const list = [...notes];
-    const fromIndex = list.findIndex((n) => n.id === draggedId);
-    const targetNote = list.find((n) => n.id === targetId);
-    if (fromIndex === -1 || !targetNote || list[fromIndex].grade !== targetNote.grade) return;
-    const [item] = list.splice(fromIndex, 1);
-    let toIndex = list.findIndex((n) => n.id === targetId);
-    toIndex = after ? toIndex + 1 : toIndex;
-    list.splice(toIndex, 0, item);
-    saveNotes(list);
+    saveNotes((notes) => {
+      const list = [...notes];
+      const fromIndex = list.findIndex((n) => n.id === draggedId);
+      const targetNote = list.find((n) => n.id === targetId);
+      if (fromIndex === -1 || !targetNote || list[fromIndex].grade !== targetNote.grade) return notes;
+      const [item] = list.splice(fromIndex, 1);
+      let toIndex = list.findIndex((n) => n.id === targetId);
+      toIndex = after ? toIndex + 1 : toIndex;
+      list.splice(toIndex, 0, item);
+      return list;
+    });
   };
 
   const endDrag = () => {
