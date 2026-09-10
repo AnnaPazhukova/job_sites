@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { setPersistErrorHandler, StaleWriteError, useStore } from "./lib/storage";
 import { isLessonPast, paymentStateOf } from "./lib/utils";
+import { reportPersistError } from "./lib/sentry";
 import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
 
 // Each view (and the methodology template library that NotesView pulls in)
@@ -71,7 +72,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   // copy of that data is out of date (changed elsewhere since this tab
   // loaded it), so the fix is a refresh rather than a retry.
   useEffect(() => {
-    setPersistErrorHandler((_key, err) => {
+    setPersistErrorHandler((key, err) => {
+      reportPersistError(key, err);
       if (err instanceof StaleWriteError) {
         showToast("Данные изменились в другом месте — обновите страницу и повторите");
       } else {
