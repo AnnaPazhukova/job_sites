@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, GripVertical, Layers, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Card, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
-import { AttachmentList, AttachmentsField, LargeAttachmentList } from "../components/Attachments";
-import { fmtDateRu, GRADES, lessonLabel, sortHomeworkNewestFirst, uid } from "../lib/utils";
+import { AttachmentsField, LargeAttachmentList } from "../components/Attachments";
+import { fmtDateRu, GRADES, lessonLabel, uid } from "../lib/utils";
 import { STARTER_CONTENT } from "../lib/methodologyContent";
-import type { Attachment, Homework, Lesson, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Student, Task } from "../lib/types";
+import type { Attachment, Lesson, MethodNote, MethodNoteAttachments, MethodNoteTabKey, MethodNoteTabs, Student, Task } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
 const subjectsForGrade = (grade: string) => {
@@ -63,17 +63,10 @@ const emptyNote = (): MethodNote => ({
   updatedAt: Date.now(),
 });
 
-const HW_STATUS_LABELS: Record<Homework["status"], string> = {
-  assigned: "Не сдано",
-  submitted: "На проверке",
-  done: "Проверено",
-};
-
 interface Props {
   notes: MethodNote[];
   saveNotes: (n: Updater<MethodNote[]>) => void;
   tasks: Task[];
-  homework: Homework[];
   lessons: Lesson[];
   students: Student[];
   onOpenLesson: (studentId: string, lessonId: string) => void;
@@ -82,7 +75,7 @@ interface Props {
   setActiveId: (id: string | null) => void;
 }
 
-export function NotesView({ notes, saveNotes, tasks, homework, lessons, students, onOpenLesson, showToast, activeId, setActiveId }: Props) {
+export function NotesView({ notes, saveNotes, tasks, lessons, students, onOpenLesson, showToast, activeId, setActiveId }: Props) {
   const [creating, setCreating] = useState(false);
   const [newTopic, setNewTopic] = useState("");
   const active = notes.find((n) => n.id === activeId) || null;
@@ -113,7 +106,6 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
   }, [notes, gradeFilter, subjectFilter, query]);
 
   const relatedCount = active ? tasks.filter((t) => t.topic === active.topic).length : 0;
-  const topicHomework = active ? sortHomeworkNewestFirst(homework.filter((h) => h.noteId === active.id)) : [];
   const topicLessons = active
     ? lessons.filter((l) => l.noteId === active.id).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
     : [];
@@ -464,30 +456,6 @@ export function NotesView({ notes, saveNotes, tasks, homework, lessons, students
                           onChange={(e) => setDraftTabs((t) => ({ ...t, [tab]: e.target.value }))}
                           onBlur={handleSaveDraft}
                         />
-                        {tab === "homework" && topicHomework.length > 0 && (
-                          <div className="mt-3">
-                            <div className="text-xs font-semibold text-gray-500 mb-2">Ранее задавали по этой теме ({topicHomework.length})</div>
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                              {topicHomework
-                                .map((h) => (
-                                  <div key={h.id} className="text-xs bg-[#F7F8FA] rounded-lg px-2.5 py-2">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <div className="font-medium text-gray-700 truncate">{h.title}</div>
-                                        <div className="text-gray-400">{h.studentName}</div>
-                                      </div>
-                                      <Pill tone={h.status === "done" ? "type" : "level"}>{HW_STATUS_LABELS[h.status]}</Pill>
-                                    </div>
-                                    {h.attachments && h.attachments.length > 0 && (
-                                      <div className="mt-1.5">
-                                        <AttachmentList attachments={h.attachments} />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
 
