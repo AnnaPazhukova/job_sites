@@ -308,7 +308,6 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   notes={notes}
                   saveNotes={saveNotes}
                   tasks={tasks}
-                  homework={homework}
                   lessons={lessons}
                   students={students}
                   onOpenLesson={openLesson}
