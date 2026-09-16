@@ -430,8 +430,18 @@ export function MethodNotePicker({
   onChange: (id: string) => void;
   defaultGrade?: string;
 }) {
-  const [gradeFilter, setGradeFilter] = useState(defaultGrade && GRADES.includes(defaultGrade) ? defaultGrade : "Все классы");
-  const [subjectFilter, setSubjectFilter] = useState("Все предметы");
+  // The already-linked topic wins over defaultGrade — otherwise reopening a
+  // lesson whose topic belongs to a different grade/subject than the
+  // student's current profile grade (e.g. catch-up material, or the student
+  // moved up a grade since) filtered it out of the third <select>'s options,
+  // which made the browser fall back to showing "Не указано" even though
+  // the real link was still saved. Filters stay changeable from there — this
+  // only fixes what they open to.
+  const selectedNote = value ? notes.find((n) => n.id === value) : null;
+  const [gradeFilter, setGradeFilter] = useState(() =>
+    selectedNote ? selectedNote.grade : defaultGrade && GRADES.includes(defaultGrade) ? defaultGrade : "Все классы"
+  );
+  const [subjectFilter, setSubjectFilter] = useState(() => (selectedNote ? selectedNote.subject : "Все предметы"));
   const [query, setQuery] = useState("");
 
   const grades = useMemo(() => GRADES.filter((g) => notes.some((n) => n.grade === g)), [notes]);
