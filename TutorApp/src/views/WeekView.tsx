@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { dateKey, isLessonPast, lessonLabel, lessonPillStyle, paymentStateOf, TODAY, WEEKDAYS_RU } from "../lib/utils";
+import { colorFor, dateKey, isLessonPast, lessonLabel, lessonPillStyle, paymentStateOf, TODAY, WEEKDAYS_RU } from "../lib/utils";
 import type { Lesson, Student } from "../lib/types";
 import type { GcalEvent } from "../lib/googleCalendar";
 
@@ -71,9 +71,26 @@ interface Props {
   // action to make room for, so it shows cancellations the classic way
   // instead — grayed out and struck through, sitting in their normal slot.
   classicCancelled?: boolean;
+  // The tutor's schedule shows many students at once, so a lesson's color
+  // should identify which student it belongs to — falling back to the same
+  // deterministic per-student color Avatar uses elsewhere when no color was
+  // manually picked, same as the day view. The student portal only ever
+  // shows one student's own lessons (student identity has nothing to
+  // distinguish), where color is more useful encoding payment status
+  // instead — this opts into that.
+  paymentStatusColors?: boolean;
 }
 
-export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClick, onLessonClick, classicCancelled = false }: Props) {
+export function WeekView({
+  cursor,
+  lessons,
+  students,
+  gcalEvents = [],
+  onDayClick,
+  onLessonClick,
+  classicCancelled = false,
+  paymentStatusColors = false,
+}: Props) {
   const days = getWeekDays(cursor);
   const isToday = (d: Date) => dateKey(d) === dateKey(TODAY);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,11 +105,11 @@ export function WeekView({ cursor, lessons, students, gcalEvents = [], onDayClic
 
   function lessonAppearance(l: Lesson) {
     const isPast = isLessonPast(l);
-    const color = students.find((s) => s.id === l.studentId)?.color;
+    const ownColor = students.find((s) => s.id === l.studentId)?.color;
+    const color = ownColor || (!paymentStatusColors && l.studentId ? colorFor(l.studentId) : undefined);
     const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
-    const state = paymentStateOf(l);
-    if (state === "paid") {
+    if (paymentStatusColors && paymentStateOf(l) === "paid") {
       return {
         className: isPast ? "bg-emerald-200 text-emerald-900 hover:bg-emerald-300" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
         style: undefined,
