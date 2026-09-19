@@ -6,6 +6,7 @@ import {
   advanceTopicCycle,
   buildHomeworkAssignment,
   buildRecurringDates,
+  colorFor,
   dateKey,
   fmtDateRu,
   isLessonPast,
@@ -119,7 +120,10 @@ export function ScheduleView({
   function lessonAppearance(l: Lesson) {
     if (l.status === "cancelled") return { className: "bg-gray-100 text-gray-400 line-through", style: undefined };
     const isPast = isLessonPast(l);
-    const color = students.find((s) => s.id === l.studentId)?.color;
+    // Falls back to the same deterministic per-student color Avatar uses
+    // elsewhere, rather than leaving a lesson uncolored just because the
+    // tutor never manually picked a color for that student.
+    const color = students.find((s) => s.id === l.studentId)?.color || (l.studentId ? colorFor(l.studentId) : undefined);
     const style = lessonPillStyle(color, isPast);
     if (style) return { className: "hover:opacity-80", style };
     return isPast
