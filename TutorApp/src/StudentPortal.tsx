@@ -500,6 +500,7 @@ export default function StudentPortal({ code, onExit }: Props) {
                           students={profile ? [profile] : []}
                           classicCancelled
                           paymentStatusColors
+                          showAvoidedHours={false}
                           onDayClick={() => {}}
                           onLessonClick={(l) => {
                             if (l.status === "cancelled") {
