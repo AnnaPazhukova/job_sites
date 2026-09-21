@@ -204,12 +204,31 @@ export function NotesView({ notes, saveNotes, tasks, lessons, students, onOpenLe
   const handleGroupAttachmentsChange = (group: { keys: MethodNoteTabKey[] }, next: Attachment[]) => {
     if (!active) return;
     const [primaryKey, ...dropKeys] = group.keys;
+    // `next` is AttachmentsField's full replacement array for what this
+    // render showed it (`active.attachments` at the time) — writing it
+    // verbatim would silently wipe out any file that landed on this same
+    // tab from elsewhere (another open tab, a direct DB fix) between that
+    // snapshot and this save, since it isn't in `next` either way. Diffing
+    // against what was shown gives the actual add/remove the tutor made;
+    // reapplying just that delta against the server's current array here
+    // (inside the retry-safe updater) is safe regardless of what else
+    // changed concurrently.
+    const shown = group.keys.flatMap((k) => active.attachments?.[k] || []);
+    const shownIds = new Set(shown.map((a) => a.id));
+    const nextIds = new Set(next.map((a) => a.id));
+    const added = next.filter((a) => !shownIds.has(a.id));
+    const removedIds = new Set(shown.filter((a) => !nextIds.has(a.id)).map((a) => a.id));
     saveNotes((notes) =>
       notes.map((n) => {
         if (n.id !== activeId) return n;
         const restAttachments = { ...(n.attachments || {}) };
         for (const key of dropKeys) delete restAttachments[key];
-        const nextAttachments: MethodNoteAttachments = { ...restAttachments, [primaryKey]: next };
+        const current = (restAttachments[primaryKey] || []).filter((a) => !removedIds.has(a.id));
+        const currentIds = new Set(current.map((a) => a.id));
+        const nextAttachments: MethodNoteAttachments = {
+          ...restAttachments,
+          [primaryKey]: [...current, ...added.filter((a) => !currentIds.has(a.id))],
+        };
         return { ...n, attachments: nextAttachments, updatedAt: Date.now() };
       })
     );
