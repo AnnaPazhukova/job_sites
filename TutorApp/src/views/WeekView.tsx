@@ -79,7 +79,23 @@ interface Props {
   // distinguish), where color is more useful encoding payment status
   // instead — this opts into that.
   paymentStatusColors?: boolean;
+  // Dims a few fixed time ranges the tutor prefers to keep free (see
+  // AVOIDED_RANGES) — still fully bookable, just visually discouraged. Only
+  // meaningful for the tutor's own schedule, not a student looking at their
+  // own lessons, so the portal turns it off.
+  showAvoidedHours?: boolean;
 }
+
+// Weekday numbers match Date#getDay() (0=Sunday..6=Saturday). Purely a
+// visual nudge — clicking one of these slots still opens the add-lesson
+// modal like any other, this just makes them read as "avoid unless
+// necessary" instead of a normal open slot.
+const AVOIDED_RANGES: { weekday: number; startMinutes: number; endMinutes: number }[] = [
+  { weekday: 2, startMinutes: 17 * 60, endMinutes: 24 * 60 }, // Tuesday after 17:00
+  { weekday: 4, startMinutes: 17 * 60, endMinutes: 24 * 60 }, // Thursday after 17:00
+  { weekday: 5, startMinutes: 0, endMinutes: 24 * 60 }, // Friday, all day
+  { weekday: 6, startMinutes: 0, endMinutes: 24 * 60 }, // Saturday, all day
+];
 
 export function WeekView({
   cursor,
@@ -89,6 +105,7 @@ export function WeekView({
   onDayClick,
   onLessonClick,
   classicCancelled = false,
+  showAvoidedHours = true,
   paymentStatusColors = false,
 }: Props) {
   const days = getWeekDays(cursor);
@@ -240,6 +257,14 @@ export function WeekView({
                 {hours.map((h) => (
                   <div key={h} className="absolute left-0 right-0 border-t border-[#F0F1F4]" style={{ top: topPx(h * 60) }} />
                 ))}
+
+                {showAvoidedHours &&
+                  AVOIDED_RANGES.filter((r) => r.weekday === d.getDay()).map((r, ri) => {
+                    const top = topPx(Math.max(r.startMinutes, startHour * 60));
+                    const bottom = topPx(Math.min(r.endMinutes, endHour * 60));
+                    if (bottom <= top) return null;
+                    return <div key={ri} className="absolute left-0 right-0 bg-gray-400/10 pointer-events-none" style={{ top, height: bottom - top }} />;
+                  })}
 
                 <div className="absolute inset-0" style={{ right: cancelledLaneWidth }}>
                   {positioned.map((p) => {
