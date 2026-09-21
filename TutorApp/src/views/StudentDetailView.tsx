@@ -1023,8 +1023,7 @@ export function LessonFormModal({
     <Modal
       title={isPast ? `Урок · ${fmtDateRu(lesson!.date)}` : isEdit ? "Занятие" : "Добавление занятия"}
       onClose={onClose}
-      wide={!isPast}
-      full={isPast}
+      full
       headerActions={
         isEdit && onDeleteLesson ? (
           <button
