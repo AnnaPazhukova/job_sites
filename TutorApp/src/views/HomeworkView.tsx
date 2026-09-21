@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
-import { allNoteAttachments, fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
+import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
 import type { Attachment, Homework, HomeworkStatus, Lesson, MethodNote, Student } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
@@ -413,10 +413,10 @@ export function HomeworkEditModal({
         </div>
         <div className="space-y-2">
           <AttachmentsField attachments={attachments} onChange={setAttachments} />
-          {selectedNote && allNoteAttachments(selectedNote).length > 0 && (
+          {selectedNote?.attachments?.homework && (
             <NoteAttachmentsPicker
               topic={selectedNote.topic}
-              files={allNoteAttachments(selectedNote)}
+              files={selectedNote.attachments.homework}
               selected={attachments}
               onAdd={(a) => setAttachments((prev) => [...prev, a])}
             />
@@ -430,12 +430,14 @@ export function HomeworkEditModal({
   );
 }
 
-// Lets the tutor attach a file already stored on a methodology topic
-// (any of its tabs — Theory, Rules, Tasks, Test, Homework, wherever she
-// happened to upload it while teaching) to the homework being assigned or
-// edited here, instead of re-uploading the same worksheet every time. Only
-// offers files not already attached; picking one adds it to `selected`
-// (via onAdd) — it stays a copy, so removing it here doesn't touch the note.
+// Lets the tutor attach a file already stored on a methodology topic's own
+// Д/З tab (MethodNote.attachments.homework) to the homework being assigned
+// or edited here, instead of re-uploading the same worksheet every time.
+// Scoped to that one tab on purpose — files from Theory/Rules/Tasks/Test
+// are rarely what belongs in an assignment, and pulling from every tab
+// buried the relevant ones in noise. Only offers files not already
+// attached; picking one adds it to `selected` (via onAdd) — it stays a
+// copy, so removing it here doesn't touch the note.
 export function NoteAttachmentsPicker({
   topic,
   files,
@@ -454,18 +456,25 @@ export function NoteAttachmentsPicker({
     <div>
       <div className="text-xs text-gray-500 mb-1.5">Файлы из методики «{topic}»</div>
       <div className="flex flex-wrap gap-2">
-        {available.map((f) => (
-          <button
-            type="button"
-            key={f.id}
-            onClick={() => onAdd(f)}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-[#2563EB] hover:bg-blue-50 transition"
-          >
-            <Paperclip size={12} className="shrink-0" />
-            <span className="truncate max-w-[160px]">{f.name}</span>
-            <Plus size={12} className="shrink-0" />
-          </button>
-        ))}
+        {available.map((f) => {
+          const isImage = f.mimeType?.startsWith("image/");
+          return (
+            <button
+              type="button"
+              key={f.id}
+              onClick={() => onAdd(f)}
+              className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-[#2563EB] hover:bg-blue-50 transition"
+            >
+              {isImage ? (
+                <img src={f.url} alt="" className="w-6 h-6 rounded object-cover shrink-0 border border-blue-200" />
+              ) : (
+                <Paperclip size={12} className="shrink-0" />
+              )}
+              <span className="truncate max-w-[160px]">{f.name}</span>
+              <Plus size={12} className="shrink-0" />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -600,10 +609,10 @@ function AddHomeworkModal({
           />
         </Field>
         <AttachmentsField attachments={attachments} onChange={setAttachments} />
-        {selectedNote && allNoteAttachments(selectedNote).length > 0 && (
+        {selectedNote?.attachments?.homework && (
           <NoteAttachmentsPicker
             topic={selectedNote.topic}
-            files={allNoteAttachments(selectedNote)}
+            files={selectedNote.attachments.homework}
             selected={attachments}
             onAdd={(a) => setAttachments((prev) => [...prev, a])}
           />
