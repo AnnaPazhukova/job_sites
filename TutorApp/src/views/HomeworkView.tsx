@@ -34,13 +34,21 @@ function effectiveStatus(h: Homework) {
 export function HomeworkView({ homework, setHomework, students, lessons, notes, saveNotes, onOpenNote, showToast }: Props) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [studentFilter, setStudentFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [editingHw, setEditingHw] = useState<Homework | null>(null);
   const [presetLesson, setPresetLesson] = useState<Lesson | null>(null);
   const [showDone, setShowDone] = useState(false);
 
   const missingHwLessons = lessons
-    .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !homework.some((h) => h.lessonId === l.id))
+    .filter(
+      (l) =>
+        l.studentId &&
+        l.status !== "cancelled" &&
+        isLessonPast(l) &&
+        !homework.some((h) => h.lessonId === l.id) &&
+        (studentFilter === "all" || l.studentId === studentFilter)
+    )
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   function updateHomework(id: string, patch: Partial<Homework>) {
@@ -55,7 +63,8 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     homework.filter((h) => {
       const matchQ = h.title.toLowerCase().includes(query.toLowerCase()) || h.studentName.toLowerCase().includes(query.toLowerCase());
       const matchS = statusFilter === "all" || effectiveStatus(h) === statusFilter;
-      return matchQ && matchS;
+      const matchStudent = studentFilter === "all" || h.studentId === studentFilter;
+      return matchQ && matchS && matchStudent;
     })
   );
 
@@ -172,6 +181,17 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
               <option value="submitted">На проверке</option>
               <option value="done">Проверено</option>
               <option value="overdue">Просрочено</option>
+            </select>
+            <select value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)} className="px-3 py-2.5 rounded-xl bg-white border border-gray-300 shadow-sm text-sm">
+              <option value="all">Все ученики</option>
+              {students
+                .filter((s) => homework.some((h) => h.studentId === s.id))
+                .sort((a, b) => a.name.localeCompare(b.name, "ru"))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
             </select>
             <PrimaryButton icon={Plus} onClick={() => setShowAdd(true)}>
               Задать ДЗ
