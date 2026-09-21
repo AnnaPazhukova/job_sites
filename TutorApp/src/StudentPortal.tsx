@@ -200,6 +200,11 @@ function HomeworkRow({
         <div className="mt-2.5 px-3 py-2 rounded-lg bg-blue-50 text-sm text-gray-700">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-0.5">Комментарий преподавателя</div>
           {h.reviewComment}
+          {h.reviewAttachments && h.reviewAttachments.length > 0 && (
+            <div className="mt-1.5">
+              <AttachmentList attachments={h.reviewAttachments} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -783,6 +788,11 @@ function HomeworkTab({
         <div className="px-3.5 py-3 rounded-xl bg-blue-50">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[#2563EB] mb-1">Комментарий преподавателя</div>
           <div className="text-sm text-gray-700 whitespace-pre-wrap">{homework.reviewComment}</div>
+          {homework.reviewAttachments && homework.reviewAttachments.length > 0 && (
+            <div className="mt-2">
+              <AttachmentList attachments={homework.reviewAttachments} />
+            </div>
+          )}
         </div>
       )}
 

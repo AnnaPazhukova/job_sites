@@ -313,6 +313,7 @@ export function HomeworkEditModal({
   const [attachments, setAttachments] = useState<Attachment[]>(homework.attachments || []);
   const [submissionAttachments, setSubmissionAttachments] = useState<Attachment[]>(homework.submissionAttachments || []);
   const [reviewComment, setReviewComment] = useState(homework.reviewComment || "");
+  const [reviewAttachments, setReviewAttachments] = useState<Attachment[]>(homework.reviewAttachments || []);
   const [grade, setGrade] = useState<number | undefined>(homework.grade);
 
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
@@ -328,6 +329,7 @@ export function HomeworkEditModal({
       attachments,
       submissionAttachments,
       reviewComment: reviewComment.trim() || undefined,
+      reviewAttachments,
       grade,
     });
   }
@@ -403,6 +405,12 @@ export function HomeworkEditModal({
           />
           <div className="text-xs text-gray-400 mt-1">Увидит ученик в личном кабинете.</div>
         </Field>
+        <div>
+          <AttachmentsField attachments={reviewAttachments} onChange={setReviewAttachments} label="Моё решение (фото)" />
+          <div className="text-xs text-gray-400 mt-1">
+            Отдельно от файлов задания — сюда, например, ваше фото решения. Увидит ученик в личном кабинете; в методику не попадает.
+          </div>
+        </div>
         <div className="space-y-2">
           <AttachmentsField attachments={attachments} onChange={setAttachments} />
           {selectedNote && allNoteAttachments(selectedNote).length > 0 && (
