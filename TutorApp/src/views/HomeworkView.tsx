@@ -335,7 +335,7 @@ export function HomeworkEditModal({
   }
 
   return (
-    <Modal title="Домашнее задание" onClose={onClose} wide>
+    <Modal title="Домашнее задание" onClose={onClose} full>
       <form onSubmit={submit} className="space-y-4">
         <div className="text-sm text-gray-500">{homework.studentName}</div>
         {submissionAttachments.length > 0 && (
@@ -533,7 +533,7 @@ function AddHomeworkModal({
   }
 
   return (
-    <Modal title="Новое домашнее задание" onClose={onClose} wide>
+    <Modal title="Новое домашнее задание" onClose={onClose} full>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Ученик">
           <select
