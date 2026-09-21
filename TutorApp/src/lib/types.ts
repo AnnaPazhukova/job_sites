@@ -117,6 +117,12 @@ export interface Homework {
   submissionAttachments?: Attachment[];
   /** Tutor's feedback on the reviewed work — visible to the student too. */
   reviewComment?: string;
+  /** Tutor's own photos/files attached alongside the review — e.g. her
+   * worked solution. Kept separate from `attachments` (the assignment's own
+   * files) so it never gets swept into a methodology topic by
+   * syncHomeworkAttachmentsToNote, which only reads `attachments`. Visible
+   * to the student too, same as reviewComment. */
+  reviewAttachments?: Attachment[];
   /** Grade on the Russian 2-5 school scale — visible to the student too. */
   grade?: number;
 }
