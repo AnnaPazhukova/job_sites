@@ -33,7 +33,7 @@ function PdfThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/40 text-white opacity-0 group-hover/thumb:opacity-100 hover:bg-black/60 transition"
+          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/40 text-white hover:bg-black/60 transition"
         >
           <X size={12} />
         </button>
@@ -60,7 +60,7 @@ function ImageThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white opacity-0 group-hover/thumb:opacity-100 hover:bg-black/70 transition"
+          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition"
         >
           <X size={12} />
         </button>
