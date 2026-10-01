@@ -24,7 +24,19 @@ export function initSentry() {
 // this app has had. Surfacing it here means it's visible without her
 // having to notice and report it first.
 export function reportPersistError(key: string, error: unknown) {
-  Sentry.captureException(error, { tags: { source: "persist", key } });
+  const tags: Record<string, string> = { source: "persist", key };
+  // A failed Supabase/PostgREST write throws a plain {code, details, hint,
+  // message} object rather than an Error instance, so Sentry's default
+  // capture only shows "Object captured as exception with keys: ..." in the
+  // alert — unreadable without opening the dashboard. Pulling the actual
+  // string values into tags surfaces them directly in the alert email.
+  if (error && typeof error === "object" && !(error instanceof Error)) {
+    for (const field of ["code", "message", "details", "hint"] as const) {
+      const value = (error as Record<string, unknown>)[field];
+      if (typeof value === "string" && value) tags[`db_${field}`] = value;
+    }
+  }
+  Sentry.captureException(error, { tags });
 }
 
 export { Sentry };

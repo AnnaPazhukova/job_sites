@@ -63,7 +63,7 @@ const HW_STATUS_META: Record<HomeworkStatus, { label: string; color: string }> =
 
 interface Props {
   students: Student[];
-  setStudents: (s: Student[]) => void;
+  setStudents: (s: Updater<Student[]>) => void;
   lessons: Lesson[];
   setLessons: (l: Updater<Lesson[]>) => void;
   homework: Homework[];
@@ -136,11 +136,11 @@ export function StudentDetailPage({
   }
 
   function save(patch: Partial<Student>) {
-    setStudents(students.map((s) => (s.id === student!.id ? { ...s, ...patch } : s)));
+    setStudents((students) => students.map((s) => (s.id === student!.id ? { ...s, ...patch } : s)));
   }
 
   function exclude() {
-    setStudents(students.filter((s) => s.id !== student!.id));
+    setStudents((students) => students.filter((s) => s.id !== student!.id));
     showToast("Ученик исключён из списка");
     setView("students");
   }

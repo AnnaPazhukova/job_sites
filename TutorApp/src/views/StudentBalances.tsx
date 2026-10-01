@@ -4,10 +4,11 @@ import { Avatar, Card, Field, Modal, PrimaryButton, TextInput } from "../compone
 import { fmtDateRu, fmtMoney, TODAY_KEY } from "../lib/utils";
 import { studentBalance } from "./StudentsView";
 import type { Lesson, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 interface Props {
   students: Student[];
-  setStudents: (s: Student[]) => void;
+  setStudents: (s: Updater<Student[]>) => void;
   lessons: Lesson[];
 }
 
@@ -21,7 +22,7 @@ export function StudentBalances({ students, setStudents, lessons }: Props) {
   const filtered = filter === "debt" ? withBalance.filter((x) => x.balance < 0) : withBalance;
 
   function saveSubscription(studentId: string, total: number, startDate: string) {
-    setStudents(students.map((s) => (s.id === studentId ? { ...s, subscription: { total, remaining: total, startDate } } : s)));
+    setStudents((students) => students.map((s) => (s.id === studentId ? { ...s, subscription: { total, remaining: total, startDate } } : s)));
     setSubModalFor(null);
   }
 

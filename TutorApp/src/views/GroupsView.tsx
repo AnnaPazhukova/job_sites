@@ -3,10 +3,11 @@ import { Plus, Trash2, UsersRound } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { uid } from "../lib/utils";
 import type { Group, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 interface Props {
   groups: Group[];
-  setGroups: (g: Group[]) => void;
+  setGroups: (g: Updater<Group[]>) => void;
   students: Student[];
   showToast: (t: string) => void;
 }
@@ -15,13 +16,13 @@ export function GroupsView({ groups, setGroups, students, showToast }: Props) {
   const [showAdd, setShowAdd] = useState(false);
 
   function addGroup(name: string, memberIds: string[]) {
-    setGroups([{ id: uid(), name, memberIds }, ...groups]);
+    setGroups((groups) => [{ id: uid(), name, memberIds }, ...groups]);
     setShowAdd(false);
     showToast(`Группа «${name}» создана`);
   }
 
   function removeGroup(id: string) {
-    setGroups(groups.filter((g) => g.id !== id));
+    setGroups((groups) => groups.filter((g) => g.id !== id));
     showToast("Группа удалена");
   }
 
