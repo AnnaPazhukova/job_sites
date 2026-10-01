@@ -35,7 +35,7 @@ interface Props {
   lessons: Lesson[];
   setLessons: (l: Updater<Lesson[]>) => void;
   students: Student[];
-  setStudents: (s: Student[]) => void;
+  setStudents: (s: Updater<Student[]>) => void;
   groups: Group[];
   homework: Homework[];
   setHomework: (h: Updater<Homework[]>) => void;
@@ -164,7 +164,7 @@ export function ScheduleView({
     });
     setLessons((lessons) => [...lessons, ...created]);
     if (cycle && targetStudent && cycle !== targetStudent.topicCycle) {
-      setStudents(students.map((s) => (s.id === targetStudent.id ? { ...s, topicCycle: cycle } : s)));
+      setStudents((students) => students.map((s) => (s.id === targetStudent.id ? { ...s, topicCycle: cycle } : s)));
     }
     setShowAdd(false);
     showToast(created.length > 1 ? `Добавлено занятий: ${created.length}` : "Занятие добавлено в расписание");
@@ -192,12 +192,12 @@ export function ScheduleView({
       cycle = advanced.cycle;
     }
     setLessons((lessons) => lessons.map((l) => (nextNoteIds.has(l.id) ? { ...l, noteId: nextNoteIds.get(l.id) } : l)));
-    setStudents(students.map((s) => (s.id === studentId ? { ...s, topicCycle: cycle } : s)));
+    setStudents((students) => students.map((s) => (s.id === studentId ? { ...s, topicCycle: cycle } : s)));
     showToast(upcoming.length > 0 ? `Темы расставлены: ${upcoming.length} занятий` : "Темы будут расставляться для новых занятий");
   }
 
   function disableTopicCycle(studentId: string) {
-    setStudents(students.map((s) => (s.id === studentId ? { ...s, topicCycle: undefined } : s)));
+    setStudents((students) => students.map((s) => (s.id === studentId ? { ...s, topicCycle: undefined } : s)));
     showToast("Автоматические темы отключены");
   }
 
@@ -206,7 +206,7 @@ export function ScheduleView({
   // total.
   function applySubscriptionDelta(studentId: string | undefined, delta: number) {
     if (!studentId || delta === 0) return;
-    setStudents(
+    setStudents((students) =>
       students.map((s) =>
         s.id === studentId && s.subscription
           ? { ...s, subscription: { ...s.subscription, remaining: Math.max(0, Math.min(s.subscription.total, s.subscription.remaining + delta)) } }

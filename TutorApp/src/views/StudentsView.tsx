@@ -3,6 +3,7 @@ import { Calendar as CalendarIcon, Mail, Phone, Plus, School, Search, Settings a
 import { Avatar, Card, DurationPicker, EmptyState, Field, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { durationLabel, fmtMoney, GRADES, isLessonPast, paidAmountOf, remainingAmountOf, TODAY_KEY, uid } from "../lib/utils";
 import type { Group, Lesson, Student } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 // Positive balance = prepaid credit (money already paid for lessons that
 // haven't happened yet, including partial prepayments).
@@ -19,7 +20,7 @@ export function studentBalance(lessons: Lesson[], studentId: string) {
 
 interface Props {
   students: Student[];
-  setStudents: (s: Student[]) => void;
+  setStudents: (s: Updater<Student[]>) => void;
   groups: Group[];
   lessons: Lesson[];
   setView: (v: "students" | "student-detail") => void;
@@ -61,13 +62,13 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
       ...data,
       name,
     };
-    setStudents([student, ...students]);
+    setStudents((students) => [student, ...students]);
     setShowAdd(false);
     showToast(`Ученик «${name}» добавлен`);
   }
 
   function removeStudent(id: string) {
-    setStudents(students.filter((s) => s.id !== id));
+    setStudents((students) => students.filter((s) => s.id !== id));
     showToast("Ученик удалён");
   }
 

@@ -3,6 +3,7 @@ import { BookOpen, Check, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Card, EmptyState, Field, GhostButton, PageHeader, Pill, PrimaryButton, Select, TextArea, TextInput } from "../components/ui";
 import { uid } from "../lib/utils";
 import type { Task } from "../lib/types";
+import type { Updater } from "../lib/storage";
 
 const LEVELS = ["Базовый", "Средний", "Продвинутый", "Олимпиадный"];
 const TYPES = ["Тренировочная", "Диагностическая", "На ошибку", "Итоговая"];
@@ -27,7 +28,7 @@ const emptyTask = (): Task => ({
 
 interface Props {
   tasks: Task[];
-  saveTasks: (t: Task[]) => void;
+  saveTasks: (t: Updater<Task[]>) => void;
   showToast: (t: string) => void;
 }
 
@@ -63,15 +64,14 @@ export function TasksView({ tasks, saveTasks, showToast }: Props) {
 
   const handleSave = (task: Task) => {
     const exists = tasks.some((t) => t.id === task.id);
-    const next = exists ? tasks.map((t) => (t.id === task.id ? task : t)) : [...tasks, task];
-    saveTasks(next);
+    saveTasks((tasks) => (tasks.some((t) => t.id === task.id) ? tasks.map((t) => (t.id === task.id ? task : t)) : [...tasks, task]));
     setEditing(null);
     setCreating(false);
     showToast(exists ? "Задача обновлена" : "Задача добавлена в базу");
   };
 
   const handleDelete = (id: string) => {
-    saveTasks(tasks.filter((t) => t.id !== id));
+    saveTasks((tasks) => tasks.filter((t) => t.id !== id));
     showToast("Задача удалена");
   };
 
