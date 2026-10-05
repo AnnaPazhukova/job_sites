@@ -31,19 +31,22 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
     return students.filter((s) => s.joinedAt && s.joinedAt <= key).length;
   });
 
-  // isLessonPast (end-of-lesson time), not just the calendar date, so a
-  // lesson later today isn't already counted as received/owed before it's
-  // even happened.
-  const pastLessons = activeLessons.filter((l) => isLessonPast(l));
-  const futureLessons = activeLessons.filter((l) => !isLessonPast(l));
+  const currentMonthPrefix = TODAY_KEY.slice(0, 7);
+  const monthLessons = activeLessons.filter((l) => l.date.slice(0, 7) === currentMonthPrefix);
+
+  // Scoped to the current month, not lifetime — a running total since the
+  // very first lesson read as implausibly large and wasn't what these cards
+  // were meant to show. isLessonPast uses end-of-lesson time, not just the
+  // calendar date, so a lesson later today isn't already counted as
+  // received/owed before it's even happened.
+  const pastLessons = monthLessons.filter((l) => isLessonPast(l));
+  const futureLessons = monthLessons.filter((l) => !isLessonPast(l));
   const paidPast = pastLessons.reduce((s, l) => s + paidAmountOf(l), 0);
   const paidAdvance = futureLessons.reduce((s, l) => s + paidAmountOf(l), 0);
   const debt = pastLessons.reduce((s, l) => s + remainingAmountOf(l), 0);
   const monthEnd = dateKey(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0));
   const monthForecast = sumPrice(activeLessons.filter((l) => l.date > TODAY_KEY && l.date <= monthEnd));
 
-  const currentMonthPrefix = TODAY_KEY.slice(0, 7);
-  const monthLessons = activeLessons.filter((l) => l.date.slice(0, 7) === currentMonthPrefix);
   const workedHours = monthLessons.filter((l) => l.date <= TODAY_KEY).reduce((s, l) => s + (Number(l.duration) || 0), 0) / 60;
   const scheduledHours = monthLessons.filter((l) => l.date > TODAY_KEY).reduce((s, l) => s + (Number(l.duration) || 0), 0) / 60;
 
@@ -57,9 +60,9 @@ export function StatsView({ lessons, students, homework, tasks, notes, setView }
       <div className="text-sm text-gray-500 mb-5">Анализ вашей деятельности на сегодняшний день</div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard color="emerald" icon={CheckCircle2} label="Оплаченные занятия" sub="Получено по факту" value={fmtMoney(paidPast)} onClick={() => setView("schedule")} />
-        <StatCard color="teal" icon={Wallet} label="Оплачено вперёд" sub="Авансовые платежи" value={fmtMoney(paidAdvance)} onClick={() => setView("schedule")} />
-        <StatCard color="rose" icon={AlertCircle} label="Ожидает оплаты" sub="Дебиторская задолженность" value={fmtMoney(debt)} onClick={() => setView("schedule")} />
+        <StatCard color="emerald" icon={CheckCircle2} label="Оплаченные занятия" sub="Получено в этом месяце" value={fmtMoney(paidPast)} onClick={() => setView("schedule")} />
+        <StatCard color="teal" icon={Wallet} label="Оплачено вперёд" sub="Авансы за этот месяц" value={fmtMoney(paidAdvance)} onClick={() => setView("schedule")} />
+        <StatCard color="rose" icon={AlertCircle} label="Ожидает оплаты" sub="Долг за этот месяц" value={fmtMoney(debt)} onClick={() => setView("schedule")} />
         <StatCard color="blue" icon={TrendingUp} label="До конца месяца" sub="Прогноз дохода" value={fmtMoney(monthForecast)} onClick={() => setView("schedule")} />
       </div>
 
