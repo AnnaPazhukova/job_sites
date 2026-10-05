@@ -11,17 +11,22 @@ initSentry()
 // navigates there. Each new deploy replaces those files with freshly
 // hashed ones — so a tab that's been open since before a deploy still has
 // the *old* index.html in memory, and its first visit to a not-yet-loaded
-// route asks for a chunk URL that no longer exists on the server. Vite
-// fires this event for exactly that case; a one-time reload picks up the
-// new index.html and fixes it, same as a manual refresh would. Guarded by
-// sessionStorage so a genuine, unrelated failure (e.g. actually offline)
-// doesn't reload forever.
-window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault()
-  const key = 'reloaded-after-preload-error'
+// route asks for a chunk URL that no longer exists on the server. A
+// one-time reload picks up the new index.html and fixes it, same as a
+// manual refresh would. Each distinct cause gets its own sessionStorage
+// key, so a genuine, unrelated repeat failure (e.g. actually offline)
+// doesn't reload forever, and one cause's reload doesn't suppress another.
+function reloadOnce(key: string) {
   if (sessionStorage.getItem(key)) return
   sessionStorage.setItem(key, '1')
   window.location.reload()
+}
+
+// Vite's own signal for this — fires when a chunk request itself fails
+// (404, network error).
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  reloadOnce('reloaded-after-preload-error')
 })
 
 function CrashFallback() {
@@ -45,7 +50,19 @@ function CrashFallback() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Sentry.ErrorBoundary fallback={<CrashFallback />}>
+    <Sentry.ErrorBoundary
+      fallback={<CrashFallback />}
+      onError={(error) => {
+        // The other shape a stale chunk reference fails in: the dynamic
+        // import resolves to undefined instead of rejecting (so
+        // vite:preloadError above never fires), and React.lazy's own
+        // internal `.default` lookup throws this exact TypeError. Seen in
+        // production right after a deploy, same as the preload-error case.
+        if (error instanceof TypeError && /reading '?default'?/.test(error.message)) {
+          reloadOnce('reloaded-after-lazy-default-error')
+        }
+      }}
+    >
       <AuthGate />
     </Sentry.ErrorBoundary>
   </StrictMode>,
