@@ -303,7 +303,7 @@ export function ScheduleView({
   const highlightDates = useMemo(() => new Set(displayedLessons.map((l) => l.date)), [displayedLessons]);
   const cancelRequests = lessons.filter((l) => l.cancelRequested);
   const missingRecordLessons = lessons
-    .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !l.comment && (!l.attachments || l.attachments.length === 0))
+    .filter((l) => l.studentId && l.status !== "cancelled" && isLessonPast(l) && !l.comment?.trim())
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   return (
