@@ -176,6 +176,5 @@ export type ViewId =
   | "schedule"
   | "messages"
   | "homework"
-  | "tasks"
   | "notes"
   | "stats";

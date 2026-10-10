@@ -26,7 +26,6 @@ const GroupsView = lazy(() => import("./views/GroupsView").then((m) => ({ defaul
 const ScheduleView = lazy(() => import("./views/ScheduleView").then((m) => ({ default: m.ScheduleView })));
 const MessagesView = lazy(() => import("./views/MessagesView").then((m) => ({ default: m.MessagesView })));
 const HomeworkView = lazy(() => import("./views/HomeworkView").then((m) => ({ default: m.HomeworkView })));
-const TasksView = lazy(() => import("./views/TasksView").then((m) => ({ default: m.TasksView })));
 const NotesView = lazy(() => import("./views/NotesView").then((m) => ({ default: m.NotesView })));
 const StatsView = lazy(() => import("./views/StatsView").then((m) => ({ default: m.StatsView })));
 
@@ -35,7 +34,6 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon; disabled?: boole
   { id: "schedule", label: "Расписание", icon: Calendar },
   { id: "messages", label: "Сообщения", icon: MessageCircle },
   { id: "homework", label: "Проверка ДЗ", icon: BookOpen },
-  { id: "tasks", label: "База заданий", icon: BookOpen, disabled: true },
   { id: "notes", label: "Методика", icon: Layers },
   { id: "stats", label: "Статистика", icon: TrendingUp },
 ];
@@ -302,7 +300,6 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   showToast={showToast}
                 />
               )}
-              {view === "tasks" && <TasksView tasks={tasks} saveTasks={saveTasks} showToast={showToast} />}
               {view === "notes" && (
                 <NotesView
                   notes={notes}
