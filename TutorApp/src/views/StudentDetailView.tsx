@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  FileText,
   KeyRound,
   Layers,
   Mail,
@@ -32,10 +33,12 @@ import {
   advanceTopicCycle,
   buildHomeworkAssignment,
   buildRecurringDates,
+  dateKey,
   fmtDateRu,
   fmtMoney,
   GRADES,
   isLessonPast,
+  MONTHS_RU,
   normalizeHomeworkStatus,
   paidAmountOf,
   paymentStateOf,
@@ -50,7 +53,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal, NoteAttachmentsPicker } from "./HomeworkView";
-import type { Attachment, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, Student, Subscription, ViewId } from "../lib/types";
+import type { Attachment, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, MonthlyReport, Student, Subscription, ViewId } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -72,6 +75,8 @@ interface Props {
   setMessages: (m: Updater<MessagesByStudent>) => void;
   notes: MethodNote[];
   saveNotes: (n: Updater<MethodNote[]>) => void;
+  monthlyReports: MonthlyReport[];
+  saveMonthlyReports: (r: Updater<MonthlyReport[]>) => void;
   selectedStudentId: string | null;
   setView: (v: ViewId) => void;
   showToast: (t: string) => void;
@@ -91,6 +96,8 @@ export function StudentDetailPage({
   setMessages,
   notes,
   saveNotes,
+  monthlyReports,
+  saveMonthlyReports,
   selectedStudentId,
   setView,
   showToast,
@@ -117,6 +124,7 @@ export function StudentDetailPage({
   const [copied, setCopied] = useState(false);
   const [showPackagePicker, setShowPackagePicker] = useState(false);
   const [editingHw, setEditingHw] = useState<Homework | null>(null);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (!studentPortalEnabled || !selectedStudentId) return;
@@ -335,6 +343,9 @@ export function StudentDetailPage({
                 {inviteBusy ? "Создаём…" : "Пригласить в кабинет"}
               </GhostButton>
             )}
+            <GhostButton icon={FileText} onClick={() => setShowReport(true)}>
+              Отчёт за месяц
+            </GhostButton>
             <PrimaryButton icon={MessageCircle} onClick={() => setView("messages")}>
               Написать
             </PrimaryButton>
@@ -667,7 +678,193 @@ export function StudentDetailPage({
         })()}
 
       {editingHw && <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
+
+      {showReport && (
+        <MonthlyReportModal
+          student={student}
+          lessons={lessons}
+          homework={homework}
+          notes={notes}
+          monthlyReports={monthlyReports}
+          saveMonthlyReports={saveMonthlyReports}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function ReportRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl bg-[#F7F8FA] border border-[#E7E9EE] px-3.5 py-3">
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</div>
+      <div className="text-sm text-gray-700">{children}</div>
+    </div>
+  );
+}
+
+function MonthlyReportModal({
+  student,
+  lessons,
+  homework,
+  notes,
+  monthlyReports,
+  saveMonthlyReports,
+  onClose,
+}: {
+  student: Student;
+  lessons: Lesson[];
+  homework: Homework[];
+  notes: MethodNote[];
+  monthlyReports: MonthlyReport[];
+  saveMonthlyReports: (r: Updater<MonthlyReport[]>) => void;
+  onClose: () => void;
+}) {
+  const [month, setMonth] = useState(TODAY_KEY.slice(0, 7));
+  const [observations, setObservations] = useState("");
+  const [plan, setPlan] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Free-text fields are per student+month — switching months (or first
+  // opening the modal) loads whatever was saved for that month, if anything.
+  useEffect(() => {
+    const found = monthlyReports.find((r) => r.studentId === student.id && r.month === month);
+    setObservations(found?.observations || "");
+    setPlan(found?.plan || "");
+    setCopied(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, student.id]);
+
+  const monthLessons = lessons
+    .filter((l) => l.studentId === student.id && l.date.slice(0, 7) === month)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const held = monthLessons.filter((l) => l.status !== "cancelled" && isLessonPast(l));
+  const cancelled = monthLessons.filter((l) => l.status === "cancelled");
+  const scheduledAhead = monthLessons.filter((l) => l.status !== "cancelled" && !isLessonPast(l));
+
+  const topics: string[] = [];
+  for (const l of held) {
+    const topic = l.noteId ? notes.find((n) => n.id === l.noteId)?.topic : undefined;
+    if (topic && !topics.includes(topic)) topics.push(topic);
+  }
+
+  const monthHomework = homework.filter((h) => {
+    if (h.studentId !== student.id) return false;
+    if (h.createdAt) return dateKey(new Date(h.createdAt)).slice(0, 7) === month;
+    const linkedLesson = h.lessonId ? lessons.find((l) => l.id === h.lessonId) : undefined;
+    return linkedLesson ? linkedLesson.date.slice(0, 7) === month : false;
+  });
+  const hwDone = monthHomework.filter((h) => normalizeHomeworkStatus(h.status) === "done").length;
+  const hwNotDone = monthHomework.filter((h) => normalizeHomeworkStatus(h.status) === "assigned").length;
+
+  const attendanceText = `Проведено ${held.length}${cancelled.length > 0 ? `, отменено ${cancelled.length}` : ""}${
+    scheduledAhead.length > 0 ? `, запланировано ${scheduledAhead.length}` : ""
+  }`;
+  const homeworkText = `Задано ${monthHomework.length}, выполнено ${hwDone}${hwNotDone > 0 ? `, не сдано ${hwNotDone}` : ""}`;
+  const topicsText = topics.length ? topics.join(", ") : "—";
+
+  function persist() {
+    saveMonthlyReports((reports) => {
+      const i = reports.findIndex((r) => r.studentId === student.id && r.month === month);
+      const next: MonthlyReport = {
+        id: i >= 0 ? reports[i].id : uid(),
+        studentId: student.id,
+        month,
+        observations,
+        plan,
+        updatedAt: Date.now(),
+      };
+      return i >= 0 ? reports.map((r, ri) => (ri === i ? next : r)) : [...reports, next];
+    });
+  }
+
+  function reportText(): string {
+    const [y, m] = month.split("-").map(Number);
+    const lines = [
+      `Отчёт за ${MONTHS_RU[m - 1].toLowerCase()} ${y} — ${student.name}`,
+      "",
+      `Посещаемость: ${attendanceText}`,
+      `Пройденные темы: ${topicsText}`,
+      `Домашние задания: ${homeworkText}`,
+    ];
+    if (observations.trim()) lines.push("", "Наблюдения:", observations.trim());
+    if (plan.trim()) lines.push("", "План на следующий месяц:", plan.trim());
+    return lines.join("\n");
+  }
+
+  async function copyReport() {
+    persist();
+    try {
+      await navigator.clipboard.writeText(reportText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fields are saved regardless — only the clipboard step failed.
+    }
+  }
+
+  const [y, m] = month.split("-").map(Number);
+
+  return (
+    <Modal title="Отчёт за месяц" onClose={onClose} wide>
+      <div className="flex items-center justify-between mb-4">
+        <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="font-semibold">
+          {MONTHS_RU[m - 1]} {y}
+        </div>
+        <button
+          type="button"
+          onClick={() => setMonth(shiftMonth(month, 1))}
+          disabled={month >= TODAY_KEY.slice(0, 7)}
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      <div className="space-y-2.5 mb-5">
+        <ReportRow label="Посещаемость">{attendanceText}</ReportRow>
+        <ReportRow label="Пройденные темы">{topicsText}</ReportRow>
+        <ReportRow label="Домашние задания">{homeworkText}</ReportRow>
+      </div>
+
+      <div className="space-y-4">
+        <Field label="Наблюдения репетитора">
+          <TextArea
+            value={observations}
+            onChange={(e) => setObservations(e.target.value)}
+            rows={4}
+            placeholder="Что усвоено хорошо, какие слабые места..."
+          />
+        </Field>
+        <Field label="План на следующий месяц">
+          <TextArea value={plan} onChange={(e) => setPlan(e.target.value)} rows={3} placeholder="Что планируете разобрать дальше..." />
+        </Field>
+      </div>
+
+      <div className="flex gap-2 pt-5">
+        <GhostButton
+          full
+          onClick={() => {
+            persist();
+            onClose();
+          }}
+        >
+          Сохранить
+        </GhostButton>
+        <PrimaryButton full icon={Copy} onClick={copyReport}>
+          {copied ? "Скопировано" : "Скопировать отчёт"}
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 }
 

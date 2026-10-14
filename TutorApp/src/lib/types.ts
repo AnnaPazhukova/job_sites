@@ -170,6 +170,20 @@ export interface MethodNote {
   updatedAt: number;
 }
 
+/** A tutor-authored monthly progress report for one student — the
+ * attendance/topics/homework sections are recomputed from lessons/homework
+ * each time it's opened, but `observations` and `plan` are free text the
+ * tutor writes, so only those need to persist. One per student per month. */
+export interface MonthlyReport {
+  id: string;
+  studentId: string;
+  /** "YYYY-MM" */
+  month: string;
+  observations: string;
+  plan: string;
+  updatedAt: number;
+}
+
 export type ViewId =
   | "students"
   | "student-detail"
