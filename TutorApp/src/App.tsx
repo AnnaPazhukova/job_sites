@@ -14,7 +14,7 @@ import {
 import { setPersistErrorHandler, StaleWriteError, useStore } from "./lib/storage";
 import { isLessonPast, paymentStateOf } from "./lib/utils";
 import { reportPersistError } from "./lib/sentry";
-import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, Student, Task, ViewId } from "./lib/types";
+import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, MonthlyReport, Student, Task, ViewId } from "./lib/types";
 
 // Each view (and the methodology template library that NotesView pulls in)
 // is loaded only once the tutor actually opens that section, instead of all
@@ -55,6 +55,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
   const [homework, setHomework] = useStore<Homework[]>("homework", []);
   const [messages, setMessages] = useStore<MessagesByStudent>("messages", {});
   const [tasks, saveTasks, tasksLoaded] = useStore<Task[]>("tasks", []);
+  const [monthlyReports, saveMonthlyReports] = useStore<MonthlyReport[]>("monthly-reports", []);
   const [notes, saveNotes, notesLoaded] = useStore<MethodNote[]>("methodology-notes", []);
   const [seedFlags, saveSeedFlags, seedFlagsLoaded] = useStore<Record<string, boolean>>("seed-flags", {});
 
@@ -264,6 +265,8 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   setMessages={setMessages}
                   notes={notes}
                   saveNotes={saveNotes}
+                  monthlyReports={monthlyReports}
+                  saveMonthlyReports={saveMonthlyReports}
                   selectedStudentId={selectedStudentId}
                   setView={setView}
                   showToast={showToast}
