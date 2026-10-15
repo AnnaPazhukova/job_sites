@@ -1108,6 +1108,10 @@ export function LessonFormModal({
   const [deductSubscription, setDeductSubscription] = useState(lesson?.subscriptionDeducted ?? false);
   const [comment, setComment] = useState(lesson?.comment || "");
   const [privateNote, setPrivateNote] = useState(lesson?.privateNote || "");
+  // Collapsed by default so it doesn't compete for attention with the
+  // comment every lesson — expanded automatically if a note was already
+  // written, so existing content is never hidden.
+  const [showPrivateNote, setShowPrivateNote] = useState(!!lesson?.privateNote);
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
   const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
@@ -1409,15 +1413,25 @@ export function LessonFormModal({
                     placeholder={isPast ? "Как прошёл урок, что отработали, на что обратить внимание..." : "Что планируете разобрать на этом занятии..."}
                   />
                 </Field>
-                <Field label="Личная заметка">
-                  <TextArea
-                    value={privateNote}
-                    onChange={(e) => setPrivateNote(e.target.value)}
-                    rows={3}
-                    placeholder="Заметки только для себя..."
-                  />
-                  <div className="text-xs text-gray-400 mt-1">Видна только вам, ученику не показывается.</div>
-                </Field>
+                {showPrivateNote ? (
+                  <Field label="Личная заметка">
+                    <TextArea
+                      value={privateNote}
+                      onChange={(e) => setPrivateNote(e.target.value)}
+                      rows={3}
+                      placeholder="Заметки только для себя..."
+                    />
+                    <div className="text-xs text-gray-400 mt-1">Видна только вам, ученику не показывается.</div>
+                  </Field>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowPrivateNote(true)}
+                    className="text-sm font-medium text-[#2563EB] hover:opacity-70 transition"
+                  >
+                    + Личная заметка
+                  </button>
+                )}
                 <Field label="План на следующий урок">
                   <TextArea
                     value={nextPlan}
