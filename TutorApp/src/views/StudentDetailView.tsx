@@ -218,7 +218,12 @@ export function StudentDetailPage({
     save({ subscription: { ...sub, remaining: Math.max(0, Math.min(sub.total, sub.remaining + delta)) } });
   }
 
-  function saveLesson(data: Partial<Lesson> & { occurrences?: string[] }) {
+  // `keepOpen` lets a caller persist a partial patch (e.g. assignHomework
+  // below, syncing just the chosen topic before creating the homework)
+  // without closing the modal and discarding whatever else the tutor was
+  // still typing into it — only a real submit (the Save button, or a new
+  // lesson) should close it.
+  function saveLesson(data: Partial<Lesson> & { occurrences?: string[] }, opts?: { keepOpen?: boolean }) {
     if (data.id) {
       const wasDeducted = lessons.find((l) => l.id === data.id)?.subscriptionDeducted ?? false;
       if (data.subscriptionDeducted !== undefined && data.subscriptionDeducted !== wasDeducted) {
@@ -226,6 +231,7 @@ export function StudentDetailPage({
       }
       setLessons((lessons) => lessons.map((l) => (l.id === data.id ? { ...l, ...data } : l)));
       showToast("Занятие обновлено");
+      if (opts?.keepOpen) return;
     } else {
       const { occurrences, ...base } = data;
       const dates = occurrences && occurrences.length ? occurrences : [base.date as string];
@@ -1054,7 +1060,7 @@ interface LessonFormProps {
   onAssignHomework?: (title: string, noteId?: string, due?: string, attachments?: Attachment[]) => void;
   onUpdateHomework?: (id: string, patch: Partial<Homework>) => void;
   onClose: () => void;
-  onSave: (data: Partial<Lesson> & { occurrences?: string[] }) => void;
+  onSave: (data: Partial<Lesson> & { occurrences?: string[] }, opts?: { keepOpen?: boolean }) => void;
   onCancelLesson: (() => void) | null;
   /** Permanently removes this lesson (unlike onCancelLesson, which just marks it cancelled). */
   onDeleteLesson?: (scope: LessonDeleteScope) => void;
@@ -1101,6 +1107,7 @@ export function LessonFormModal({
   const [paidAmount, setPaidAmount] = useState(lesson ? paidAmountOf(lesson) : 0);
   const [deductSubscription, setDeductSubscription] = useState(lesson?.subscriptionDeducted ?? false);
   const [comment, setComment] = useState(lesson?.comment || "");
+  const [privateNote, setPrivateNote] = useState(lesson?.privateNote || "");
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
   const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
@@ -1177,6 +1184,7 @@ export function LessonFormModal({
         paidAmount,
         subscriptionDeducted: deductSubscription,
         comment,
+        privateNote: privateNote || undefined,
         nextPlan: nextPlan || undefined,
         attachments: lessonAttachments,
         noteId: noteId || undefined,
@@ -1189,7 +1197,7 @@ export function LessonFormModal({
   function assignHomework() {
     if (!hwText.trim() || !onAssignHomework) return;
     if (isEdit && noteId !== (lesson?.noteId || "")) {
-      onSave({ id: lesson!.id, noteId: noteId || undefined });
+      onSave({ id: lesson!.id, noteId: noteId || undefined }, { keepOpen: true });
     }
     onAssignHomework(hwText.trim(), noteId || undefined, hwDue || undefined, hwAttachments);
     setHwText("");
@@ -1400,6 +1408,15 @@ export function LessonFormModal({
                     rows={5}
                     placeholder={isPast ? "Как прошёл урок, что отработали, на что обратить внимание..." : "Что планируете разобрать на этом занятии..."}
                   />
+                </Field>
+                <Field label="Личная заметка">
+                  <TextArea
+                    value={privateNote}
+                    onChange={(e) => setPrivateNote(e.target.value)}
+                    rows={3}
+                    placeholder="Заметки только для себя..."
+                  />
+                  <div className="text-xs text-gray-400 mt-1">Видна только вам, ученику не показывается.</div>
                 </Field>
                 <Field label="План на следующий урок">
                   <TextArea
