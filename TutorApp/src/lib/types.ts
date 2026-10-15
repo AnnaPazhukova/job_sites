@@ -61,6 +61,9 @@ export interface Lesson {
    * "paid" and 0 otherwise (see paidAmountOf in lib/utils.ts). */
   paidAmount?: number;
   comment?: string;
+  /** Tutor-only note about the lesson — unlike `comment`, never shown to the
+   * student in the portal. */
+  privateNote?: string;
   /** Methodology topic covered in this lesson (see MethodNote). */
   noteId?: string;
   /** Tutor's plan for the next lesson, set when reviewing this one. */
