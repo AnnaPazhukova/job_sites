@@ -1108,10 +1108,10 @@ export function LessonFormModal({
   const [deductSubscription, setDeductSubscription] = useState(lesson?.subscriptionDeducted ?? false);
   const [comment, setComment] = useState(lesson?.comment || "");
   const [privateNote, setPrivateNote] = useState(lesson?.privateNote || "");
-  // Collapsed by default so it doesn't compete for attention with the
-  // comment every lesson — expanded automatically if a note was already
-  // written, so existing content is never hidden.
-  const [showPrivateNote, setShowPrivateNote] = useState(!!lesson?.privateNote);
+  // Always collapsed on open — even when a note was already written — so it
+  // never competes for attention with the comment; the tutor expands it
+  // deliberately via the toggle.
+  const [showPrivateNote, setShowPrivateNote] = useState(false);
   const [nextPlan, setNextPlan] = useState(lesson?.nextPlan || "");
   const [lessonAttachments, setLessonAttachments] = useState<Attachment[]>(lesson?.attachments || []);
   const [noteId, setNoteId] = useState(lesson?.noteId || "");
@@ -1413,25 +1413,28 @@ export function LessonFormModal({
                     placeholder={isPast ? "Как прошёл урок, что отработали, на что обратить внимание..." : "Что планируете разобрать на этом занятии..."}
                   />
                 </Field>
-                {showPrivateNote ? (
-                  <Field label="Личная заметка">
-                    <TextArea
-                      value={privateNote}
-                      onChange={(e) => setPrivateNote(e.target.value)}
-                      rows={3}
-                      placeholder="Заметки только для себя..."
-                    />
-                    <div className="text-xs text-gray-400 mt-1">Видна только вам, ученику не показывается.</div>
-                  </Field>
-                ) : (
+                <div>
                   <button
                     type="button"
-                    onClick={() => setShowPrivateNote(true)}
-                    className="text-sm font-medium text-[#2563EB] hover:opacity-70 transition"
+                    onClick={() => setShowPrivateNote((v) => !v)}
+                    className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-[#2563EB] transition"
                   >
-                    + Личная заметка
+                    <ChevronRight size={15} className={`text-gray-400 transition-transform ${showPrivateNote ? "rotate-90" : ""}`} />
+                    Личная заметка
+                    {!showPrivateNote && privateNote && <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />}
                   </button>
-                )}
+                  {showPrivateNote && (
+                    <div className="mt-1.5">
+                      <TextArea
+                        value={privateNote}
+                        onChange={(e) => setPrivateNote(e.target.value)}
+                        rows={3}
+                        placeholder="Заметки только для себя..."
+                      />
+                      <div className="text-xs text-gray-400 mt-1">Видна только вам, ученику не показывается.</div>
+                    </div>
+                  )}
+                </div>
                 <Field label="План на следующий урок">
                   <TextArea
                     value={nextPlan}
