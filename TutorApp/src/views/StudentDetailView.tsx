@@ -311,6 +311,12 @@ export function StudentDetailPage({
     showToast("Домашнее задание задано");
   }
 
+  function handleDeleteHomework(id: string) {
+    setHomework((homework) => homework.filter((h) => h.id !== id));
+    setEditingHw(null);
+    showToast("Домашнее задание удалено");
+  }
+
   function handleUpdateHomework(id: string, patch: Partial<Homework>) {
     setHomework((homework) => homework.map((h) => (h.id === id ? { ...h, ...patch } : h)));
     const updated = homework.find((h) => h.id === id);
@@ -683,7 +689,9 @@ export function StudentDetailPage({
           );
         })()}
 
-      {editingHw && <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} />}
+      {editingHw && (
+        <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={handleUpdateHomework} onDelete={handleDeleteHomework} />
+      )}
 
       {showReport && (
         <MonthlyReportModal

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search } from "lucide-react";
+import { AlertTriangle, BookOpen, Calendar, Check, ChevronDown, Layers, MessageSquareText, Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import { Avatar, Card, EmptyState, Field, MethodNotePicker, Modal, PageHeader, PrimaryButton, TextInput } from "../components/ui";
 import { AttachmentList, AttachmentsField } from "../components/Attachments";
 import { fmtDateRu, isLessonPast, nextLessonDate, normalizeHomeworkStatus, sortHomeworkNewestFirst, syncHomeworkAttachmentsToNote, TODAY_KEY, uid } from "../lib/utils";
@@ -57,6 +57,12 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
     if (updated) syncHomeworkAttachmentsToNote({ ...updated, ...patch }, notes, saveNotes);
     setEditingHw(null);
     showToast("Домашнее задание обновлено");
+  }
+
+  function deleteHomework(id: string) {
+    setHomework((homework) => homework.filter((h) => h.id !== id));
+    setEditingHw(null);
+    showToast("Домашнее задание удалено");
   }
 
   const filtered = sortHomeworkNewestFirst(
@@ -284,7 +290,9 @@ export function HomeworkView({ homework, setHomework, students, lessons, notes, 
           }}
         />
       )}
-      {editingHw && <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={updateHomework} />}
+      {editingHw && (
+        <HomeworkEditModal homework={editingHw} notes={notes} onClose={() => setEditingHw(null)} onSave={updateHomework} onDelete={deleteHomework} />
+      )}
     </div>
   );
 }
@@ -300,11 +308,13 @@ export function HomeworkEditModal({
   notes,
   onClose,
   onSave,
+  onDelete,
 }: {
   homework: Homework;
   notes: MethodNote[];
   onClose: () => void;
   onSave: (id: string, patch: Partial<Homework>) => void;
+  onDelete?: (id: string) => void;
 }) {
   const [title, setTitle] = useState(homework.title);
   const [due, setDue] = useState(homework.due || "");
@@ -335,7 +345,27 @@ export function HomeworkEditModal({
   }
 
   return (
-    <Modal title="Домашнее задание" onClose={onClose} full>
+    <Modal
+      title="Домашнее задание"
+      onClose={onClose}
+      full
+      headerActions={
+        onDelete ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("Удалить это домашнее задание насовсем? Это действие нельзя отменить.")) {
+                onDelete(homework.id);
+              }
+            }}
+            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+            title="Удалить домашнее задание"
+          >
+            <Trash2 size={18} />
+          </button>
+        ) : undefined
+      }
+    >
       <form onSubmit={submit} className="space-y-4">
         <div className="text-sm text-gray-500">{homework.studentName}</div>
         {submissionAttachments.length > 0 && (
