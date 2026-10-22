@@ -53,7 +53,7 @@ import {
 } from "../lib/utils";
 import { createInvite, getExistingAccessLink, inviteLink, revokeAccessLink, studentPortalEnabled } from "../lib/studentAuth";
 import { HomeworkEditModal, NoteAttachmentsPicker } from "./HomeworkView";
-import type { Attachment, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, MonthlyReport, Student, Subscription, ViewId } from "../lib/types";
+import type { Attachment, Group, Homework, HomeworkStatus, Lesson, LessonDeleteScope, MessagesByStudent, MethodNote, MonthlyReport, Student, Subscription, ViewId } from "../lib/types";
 import type { Updater } from "../lib/storage";
 
 const CALENDAR_COLORS = ["#2563EB", "#059669", "#DC2626", "#D97706", "#7C3AED", "#DB2777", "#0D9488", "#4F46E5", "#EA580C", "#4B5563"];
@@ -69,6 +69,7 @@ interface Props {
   setStudents: (s: Updater<Student[]>) => void;
   lessons: Lesson[];
   setLessons: (l: Updater<Lesson[]>) => void;
+  groups: Group[];
   homework: Homework[];
   setHomework: (h: Updater<Homework[]>) => void;
   messages: MessagesByStudent;
@@ -91,6 +92,7 @@ export function StudentDetailPage({
   setStudents,
   lessons,
   setLessons,
+  groups,
   homework,
   setHomework,
   setMessages,
@@ -697,6 +699,7 @@ export function StudentDetailPage({
         <MonthlyReportModal
           student={student}
           lessons={lessons}
+          groups={groups}
           homework={homework}
           notes={notes}
           monthlyReports={monthlyReports}
@@ -726,6 +729,7 @@ function ReportRow({ label, children }: { label: string; children: ReactNode }) 
 function MonthlyReportModal({
   student,
   lessons,
+  groups,
   homework,
   notes,
   monthlyReports,
@@ -734,6 +738,7 @@ function MonthlyReportModal({
 }: {
   student: Student;
   lessons: Lesson[];
+  groups: Group[];
   homework: Homework[];
   notes: MethodNote[];
   monthlyReports: MonthlyReport[];
@@ -755,8 +760,10 @@ function MonthlyReportModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, student.id]);
 
+  // Group lessons carry groupId instead of studentId, so count them for every member.
+  const memberGroupIds = new Set(groups.filter((g) => g.memberIds.includes(student.id)).map((g) => g.id));
   const monthLessons = lessons
-    .filter((l) => l.studentId === student.id && l.date.slice(0, 7) === month)
+    .filter((l) => (l.studentId === student.id || (l.groupId && memberGroupIds.has(l.groupId))) && l.date.slice(0, 7) === month)
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
   const held = monthLessons.filter((l) => l.status !== "cancelled" && isLessonPast(l));
   const cancelled = monthLessons.filter((l) => l.status === "cancelled");
