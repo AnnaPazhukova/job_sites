@@ -259,6 +259,7 @@ export default function App({ userEmail, onSignOut }: AppProps) {
                   setStudents={setStudents}
                   lessons={lessons}
                   setLessons={setLessons}
+                  groups={groups}
                   homework={homework}
                   setHomework={setHomework}
                   messages={messages}
