@@ -56,9 +56,16 @@ createRoot(document.getElementById('root')!).render(
         // The other shape a stale chunk reference fails in: the dynamic
         // import resolves to undefined instead of rejecting (so
         // vite:preloadError above never fires), and React.lazy's own
-        // internal `.default` lookup throws this exact TypeError. Seen in
+        // internal `._result.default` lookup throws this exact TypeError. Seen in
         // production right after a deploy, same as the preload-error case.
-        if (error instanceof TypeError && /reading '?default'?/.test(error.message)) {
+        // Each JS engine phrases it differently — V8/Chrome says "Cannot read
+        // properties of undefined (reading 'default')", JSC/Safari says
+        // "undefined is not an object (evaluating 'e._result.default')" (seen
+        // in production, Sentry issue JAVASCRIPT-REACT-H) — so this matches
+        // on React's own internal property name (`_result.default`, a dotted
+        // property access that minifiers don't rename) rather than either
+        // engine's specific wording, to catch both.
+        if (error instanceof TypeError && /reading '?default'?|_result\.default/.test(error.message)) {
           reloadOnce('reloaded-after-lazy-default-error')
         }
       }}
