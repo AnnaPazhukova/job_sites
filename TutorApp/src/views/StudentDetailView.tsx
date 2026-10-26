@@ -1150,7 +1150,7 @@ export function LessonFormModal({
   // A free lesson (priceNum <= 0) has nothing left to pay, so it's trivially
   // "paid" — matching paymentStateOf() in lib/utils.ts, which this duplicates
   // for the in-progress (not-yet-saved) price/paidAmount in this form.
-  const paymentState: "paid" | "pending" = priceNum <= 0 || paidAmount >= priceNum ? "paid" : "pending";
+  const paymentState: "paid" | "pending" = priceNum <= 0 || deductSubscription || paidAmount >= priceNum ? "paid" : "pending";
   const linkedHomework = isEdit ? homework.find((h) => h.lessonId === lesson!.id) : null;
   const selectedNote = noteId ? notes.find((n) => n.id === noteId) : null;
   const noteHomeworkText = selectedNote?.tabs?.homework?.trim() || "";
@@ -1200,7 +1200,7 @@ export function LessonFormModal({
         duration: Number(duration),
         price: Number(price),
         paymentStatus: paymentState === "paid" ? "paid" : "pending",
-        paidAmount,
+        paidAmount: deductSubscription ? priceNum : paidAmount,
         subscriptionDeducted: deductSubscription,
         comment,
         privateNote: privateNote || undefined,
