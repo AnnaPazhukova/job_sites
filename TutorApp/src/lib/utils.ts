@@ -122,12 +122,16 @@ export function sumPrice(list: { price: number }[]) {
   return list.reduce((s, l) => s + (Number(l.price) || 0), 0);
 }
 
-type PayableLesson = { price: number; paymentStatus: string; paidAmount?: number };
+type PayableLesson = { price: number; paymentStatus: string; paidAmount?: number; subscriptionDeducted?: boolean };
 
 // Amount actually paid toward a lesson's price. Lessons saved before partial
 // payment support only ever recorded the all-or-nothing paymentStatus flag,
 // so paidAmount is optional — fall back to deriving it from that flag.
+// A lesson deducted from the student's subscription is paid in full in
+// advance, whatever paidAmount/paymentStatus say (e.g. the price was edited
+// after deducting, or it was flagged before this rule existed).
 export function paidAmountOf(l: PayableLesson): number {
+  if (l.subscriptionDeducted) return Number(l.price) || 0;
   if (l.paidAmount != null) return l.paidAmount;
   return l.paymentStatus === "paid" ? Number(l.price) || 0 : 0;
 }
