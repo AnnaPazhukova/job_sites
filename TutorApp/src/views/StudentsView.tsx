@@ -9,13 +9,18 @@ import type { Updater } from "../lib/storage";
 // haven't happened yet, including partial prepayments).
 // Negative balance = debt (what's still owed on lessons already held —
 // paidAmountOf/remainingAmountOf account for partial payments too).
+// Unused subscription slots count as prepaid credit too (remaining × rate) —
+// the lessons they'll cover aren't scheduled/marked paid yet, but the money
+// is already in. Lessons deducted from the subscription are marked paid, so
+// they're covered by the lesson amounts above and not counted twice.
 // Uses isLessonPast (end-of-lesson time, not just the calendar date) so a
 // lesson later today doesn't count as debt/credit before it's even started.
-export function studentBalance(lessons: Lesson[], studentId: string) {
-  const own = lessons.filter((l) => l.studentId === studentId && l.status !== "cancelled");
+export function studentBalance(lessons: Lesson[], student: Student) {
+  const own = lessons.filter((l) => l.studentId === student.id && l.status !== "cancelled");
   const advance = own.filter((l) => !isLessonPast(l)).reduce((s, l) => s + paidAmountOf(l), 0);
   const debt = own.filter((l) => isLessonPast(l)).reduce((s, l) => s + remainingAmountOf(l), 0);
-  return advance - debt;
+  const subscriptionCredit = student.subscription ? student.subscription.remaining * (student.rate || 0) : 0;
+  return advance + subscriptionCredit - debt;
 }
 
 interface Props {
@@ -116,7 +121,7 @@ export function StudentsView({ students, setStudents, lessons, setView, showToas
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((s) => {
-            const balance = studentBalance(lessons, s.id);
+            const balance = studentBalance(lessons, s);
             return (
               <Card key={s.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer">
                 <div onClick={() => openStudent(s.id)} className="flex items-start gap-3">
