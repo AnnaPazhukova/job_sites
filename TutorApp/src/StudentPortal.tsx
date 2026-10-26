@@ -219,8 +219,9 @@ function PaymentSummary({ profile, lessons }: { profile: Student; lessons: Lesso
   const own = lessons.filter((l) => l.status !== "cancelled");
   const advance = own.filter((l) => !isLessonPast(l)).reduce((s, l) => s + paidAmountOf(l), 0);
   const debt = own.filter((l) => isLessonPast(l)).reduce((s, l) => s + remainingAmountOf(l), 0);
-  const balance = advance - debt;
   const sub = profile.subscription;
+  // Unused subscription slots are prepaid credit, same as on the tutor side.
+  const balance = advance + (sub ? sub.remaining * (profile.rate || 0) : 0) - debt;
 
   return (
     <Card className="p-4 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">

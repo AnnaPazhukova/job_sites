@@ -18,7 +18,7 @@ export function StudentBalances({ students, setStudents, lessons }: Props) {
 
   if (students.length === 0) return null;
 
-  const withBalance = students.map((s) => ({ student: s, balance: studentBalance(lessons, s.id) }));
+  const withBalance = students.map((s) => ({ student: s, balance: studentBalance(lessons, s) }));
   const filtered = filter === "debt" ? withBalance.filter((x) => x.balance < 0) : withBalance;
 
   function saveSubscription(studentId: string, total: number, startDate: string) {
