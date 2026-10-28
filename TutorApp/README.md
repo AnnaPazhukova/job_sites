@@ -149,3 +149,11 @@ npm run build    # сборка (tsc -b && vite build)
    Authorized JavaScript origins в Google Cloud Console. В Supabase →
    Authentication → URL Configuration укажите его как Site URL и
    добавьте в Redirect URLs.
+
+### Прокси Supabase через Netlify (для пользователей из РФ)
+
+Если `*.supabase.co` медленно открывается или блокируется у провайдера, в
+Netlify задайте `VITE_SUPABASE_URL=/supabase` и пересоберите сайт. Запросы
+пойдут на домен сайта, а правило в `netlify.toml` перенаправит их в Supabase.
+Сессия входа привязана к адресу, поэтому после переключения нужно один раз
+войти заново.

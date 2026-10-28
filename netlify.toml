@@ -6,6 +6,15 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Proxy Supabase through this site's own origin, so visitors whose ISP
+# throttles or blocks *.supabase.co only talk to the Netlify domain. Enabled
+# by building with VITE_SUPABASE_URL=/supabase. Must stay above the SPA rule.
+[[redirects]]
+  from = "/supabase/*"
+  to = "https://ycwwbifcogoisnxkkgtw.supabase.co/:splat"
+  status = 200
+  force = true
+
 # Single-page app: any unknown path serves index.html.
 [[redirects]]
   from = "/*"

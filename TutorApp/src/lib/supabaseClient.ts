@@ -1,6 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL;
+const rawUrl = import.meta.env.VITE_SUPABASE_URL;
+// A path like "/supabase" targets a same-origin reverse proxy (see
+// netlify.toml); supabase-js needs an absolute URL, so resolve it here.
+const url = rawUrl?.startsWith("/")
+  ? `${window.location.origin}${rawUrl}`
+  : rawUrl;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Supabase is optional: without these two build-time env vars the app falls
