@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { lazyWithReload } from "./lib/lazyWithReload";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { setDataAdapter } from "./lib/storage";
@@ -9,8 +10,8 @@ import { LoginScreen } from "./LoginScreen";
 // A tutor never needs the student portal bundle and a student never needs
 // the tutor app bundle, so each is only fetched once we know which one this
 // visitor actually is, instead of every visitor downloading both.
-const StudentPortal = lazy(() => import("./StudentPortal"));
-const App = lazy(() => import("./App"));
+const StudentPortal = lazyWithReload(() => import("./StudentPortal"));
+const App = lazyWithReload(() => import("./App"));
 
 const LOADING = <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#F7F8FA]">Загрузка…</div>;
 

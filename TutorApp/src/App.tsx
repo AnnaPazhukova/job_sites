@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { lazyWithReload } from "./lib/lazyWithReload";
 import {
   Bell,
   BookOpen,
@@ -20,14 +21,14 @@ import type { Group, Homework, Lesson, MessagesByStudent, MethodNote, MonthlyRep
 // is loaded only once the tutor actually opens that section, instead of all
 // of them — plus their combined static content — shipping in the initial
 // bundle every visitor downloads up front.
-const StudentsView = lazy(() => import("./views/StudentsView").then((m) => ({ default: m.StudentsView })));
-const StudentDetailPage = lazy(() => import("./views/StudentDetailView").then((m) => ({ default: m.StudentDetailPage })));
-const GroupsView = lazy(() => import("./views/GroupsView").then((m) => ({ default: m.GroupsView })));
-const ScheduleView = lazy(() => import("./views/ScheduleView").then((m) => ({ default: m.ScheduleView })));
-const MessagesView = lazy(() => import("./views/MessagesView").then((m) => ({ default: m.MessagesView })));
-const HomeworkView = lazy(() => import("./views/HomeworkView").then((m) => ({ default: m.HomeworkView })));
-const NotesView = lazy(() => import("./views/NotesView").then((m) => ({ default: m.NotesView })));
-const StatsView = lazy(() => import("./views/StatsView").then((m) => ({ default: m.StatsView })));
+const StudentsView = lazyWithReload(() => import("./views/StudentsView").then((m) => ({ default: m.StudentsView })));
+const StudentDetailPage = lazyWithReload(() => import("./views/StudentDetailView").then((m) => ({ default: m.StudentDetailPage })));
+const GroupsView = lazyWithReload(() => import("./views/GroupsView").then((m) => ({ default: m.GroupsView })));
+const ScheduleView = lazyWithReload(() => import("./views/ScheduleView").then((m) => ({ default: m.ScheduleView })));
+const MessagesView = lazyWithReload(() => import("./views/MessagesView").then((m) => ({ default: m.MessagesView })));
+const HomeworkView = lazyWithReload(() => import("./views/HomeworkView").then((m) => ({ default: m.HomeworkView })));
+const NotesView = lazyWithReload(() => import("./views/NotesView").then((m) => ({ default: m.NotesView })));
+const StatsView = lazyWithReload(() => import("./views/StatsView").then((m) => ({ default: m.StatsView })));
 
 const NAV_ITEMS: { id: ViewId; label: string; icon: LucideIcon; disabled?: boolean }[] = [
   { id: "students", label: "Мои ученики", icon: Users },

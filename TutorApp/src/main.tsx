@@ -3,27 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import AuthGate from './AuthGate.tsx'
 import { initSentry, Sentry } from './lib/sentry.ts'
+import { reloadOnce } from './lib/reloadOnce.ts'
 
 initSentry()
 
-// Every code-split route (ScheduleView, NotesView, ...) is a separate JS
-// file named with a content hash, fetched on demand the first time a tab
-// navigates there. Each new deploy replaces those files with freshly
-// hashed ones — so a tab that's been open since before a deploy still has
-// the *old* index.html in memory, and its first visit to a not-yet-loaded
-// route asks for a chunk URL that no longer exists on the server. A
-// one-time reload picks up the new index.html and fixes it, same as a
-// manual refresh would. Each distinct cause gets its own sessionStorage
-// key, so a genuine, unrelated repeat failure (e.g. actually offline)
-// doesn't reload forever, and one cause's reload doesn't suppress another.
-function reloadOnce(key: string) {
-  if (sessionStorage.getItem(key)) return
-  sessionStorage.setItem(key, '1')
-  window.location.reload()
-}
-
-// Vite's own signal for this — fires when a chunk request itself fails
-// (404, network error).
+// Code-split routes are hashed JS files replaced on every deploy, so a tab
+// opened before a deploy can ask for a chunk that no longer exists; a reload
+// picks up the fresh index.html. Vite's own signal for this fires when a
+// chunk request itself fails (404, network error).
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault()
   reloadOnce('reloaded-after-preload-error')
