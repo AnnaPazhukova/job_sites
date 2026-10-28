@@ -135,7 +135,7 @@ npm run build    # сборка (tsc -b && vite build)
 
 Сайт собирается как обычный Vite-проект и работает из корня домена
 (`base = "/"`), поэтому `GH_PAGES` задавать не нужно. Настройки сборки лежат в
-`netlify.toml`.
+`netlify.toml` в корне репозитория (именно там его ищет Netlify).
 
 1. На [netlify.com](https://www.netlify.com) → Add new site → Import an
    existing project → выберите репозиторий `job_sites` и ветку `main`.
