@@ -130,3 +130,22 @@ npm run build    # сборка (tsc -b && vite build)
 
 Если Supabase не настроен, кнопка «Пригласить в кабинет» не показывается —
 остальной функционал не затрагивается.
+
+## Деплой на Netlify
+
+Сайт собирается как обычный Vite-проект и работает из корня домена
+(`base = "/"`), поэтому `GH_PAGES` задавать не нужно. Настройки сборки лежат в
+`netlify.toml`.
+
+1. На [netlify.com](https://www.netlify.com) → Add new site → Import an
+   existing project → выберите репозиторий `job_sites` и ветку `main`.
+2. Site configuration → Environment variables: добавьте
+   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_GOOGLE_CLIENT_ID`,
+   `VITE_SENTRY_DSN` (те же значения, что в секретах GitHub Actions;
+   нужны только первые две, остальные необязательны).
+3. Deploy. Адрес вида `https://<имя>.netlify.app` можно сменить в
+   Domain management.
+4. Если используется вход через Google Calendar, добавьте новый адрес в
+   Authorized JavaScript origins в Google Cloud Console. В Supabase →
+   Authentication → URL Configuration укажите его как Site URL и
+   добавьте в Redirect URLs.
