@@ -14,17 +14,48 @@ interface Props {
 const isImage = (a: Attachment) => a.mimeType?.startsWith("image/");
 const isPdf = (a: Attachment) => a.mimeType === "application/pdf";
 
+// Thumbnail = first page of the PDF drawn to a small canvas; falls back to
+// the plain file icon while it loads or if the PDF can't be rendered.
 function PdfThumb({ a, onRemove }: { a: Attachment; onRemove?: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [preview, setPreview] = useState<"loading" | "ready" | "failed">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setPreview("loading");
+    renderPdfPageToCanvas(a.url, 1, canvas, 240)
+      .then(() => {
+        if (!cancelled) setPreview("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setPreview("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [a.url]);
+
+  const showIcon = preview !== "ready";
+
   return (
     <a
       href={a.url}
       target="_blank"
       rel="noreferrer"
       title={a.name}
-      className="group/thumb relative flex flex-col items-center justify-center gap-1 h-24 w-24 rounded-xl overflow-hidden border border-red-200 bg-red-50 shadow-sm hover:shadow hover:bg-red-100 transition px-1.5"
+      className="group/thumb relative flex flex-col h-32 w-24 rounded-xl overflow-hidden border border-red-200 bg-white shadow-sm hover:shadow transition"
     >
-      <FileText size={22} className="text-red-500 shrink-0" />
-      <span className="text-[10px] font-semibold text-red-600 truncate w-full text-center">{a.name}</span>
+      <div className="relative flex-1 min-h-0 overflow-hidden bg-red-50">
+        <canvas ref={canvasRef} className={`w-full h-auto block ${preview === "ready" ? "" : "hidden"}`} />
+        {showIcon && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <FileText size={22} className={`text-red-500 ${preview === "loading" ? "animate-pulse" : ""}`} />
+          </div>
+        )}
+      </div>
+      <span className="text-[10px] font-semibold text-red-600 truncate w-full text-center px-1.5 py-1 bg-red-50 border-t border-red-100">{a.name}</span>
       {onRemove && (
         <button
           type="button"
